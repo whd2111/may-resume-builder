@@ -4,12 +4,14 @@ import Home from './components/Home'
 import Stage1Chatbot from './components/Stage1Chatbot'
 import ResumeUpload from './components/ResumeUpload'
 import Stage2Tailor from './components/Stage2Tailor'
+import ResumeReviewer from './components/ResumeReviewer'
+import BatchTailor from './components/BatchTailor'
 
 function App() {
   // Hardcoded API key
   const apiKey = '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'
 
-  const [page, setPage] = useState('home') // 'home', 'build', 'update', 'tailor'
+  const [page, setPage] = useState('home') // 'home', 'build', 'update', 'tailor', 'review', 'batch'
   const [masterResume, setMasterResume] = useState(null)
 
   // Load saved resume from localStorage
@@ -64,6 +66,22 @@ function App() {
 
       {page === 'tailor' && (
         <Stage2Tailor
+          apiKey={apiKey}
+          masterResume={masterResume}
+          onBack={handleBack}
+        />
+      )}
+
+      {page === 'review' && (
+        <ResumeReviewer
+          apiKey={apiKey}
+          masterResume={masterResume}
+          onBack={handleBack}
+        />
+      )}
+
+      {page === 'batch' && (
+        <BatchTailor
           apiKey={apiKey}
           masterResume={masterResume}
           onBack={handleBack}

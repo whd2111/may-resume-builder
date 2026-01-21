@@ -32,6 +32,22 @@ function Home({ onNavigate }) {
             Already have a master resume? Paste any job description and May will customize your resume to match that specific role.
           </p>
         </div>
+
+        <div className="action-card" onClick={() => onNavigate('review')}>
+          <span className="action-card-icon">🔍</span>
+          <h2 className="action-card-title">Review My Resume</h2>
+          <p className="action-card-description">
+            Get expert AI feedback on your resume. May will analyze action verbs, metrics, clarity, and provide specific suggestions for improvement.
+          </p>
+        </div>
+
+        <div className="action-card" onClick={() => onNavigate('batch')}>
+          <span className="action-card-icon">⚡</span>
+          <h2 className="action-card-title">Batch Tailor Resumes</h2>
+          <p className="action-card-description">
+            Applying to multiple jobs? Paste several job descriptions and May will create a tailored resume for each one automatically.
+          </p>
+        </div>
       </div>
     </div>
   )
