@@ -2,26 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 
-function buildSystemPrompt(linkedInData) {
-  let prompt = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their master resume.
+const SYSTEM_PROMPT = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their master resume.
 
-CRITICAL: Track what information you've already collected. Do NOT ask for information the user has already provided.`
-
-  if (linkedInData) {
-    prompt += `
-
-LINKEDIN DATA PROVIDED:
-The user has already provided their LinkedIn profile information:
-${JSON.stringify(linkedInData, null, 2)}
-
-IMPORTANT: Do NOT ask the user about information that's already in their LinkedIn data (education institutions, job titles, companies, dates). Instead:
-- Confirm their basic info (name, contact)
-- Ask them to verify if the LinkedIn info is current and accurate
-- Focus on extracting DETAILED accomplishments and metrics for each role that aren't typically on LinkedIn
-- Dig deep into the "what" and "why" of their achievements`
-  }
-
-  return prompt + `
+CRITICAL: Track what information you've already collected. Do NOT ask for information the user has already provided.
 
 RESUME WRITING RULES:
 - Use action verbs (led, built, drove, managed, designed, etc.)
@@ -88,18 +71,12 @@ When you're ready to generate the resume, respond with a JSON object in this EXA
   }
 }
 
-Continue the conversation naturally until you have enough information to create a compelling resume.`
-}
+Continue the conversation naturally until you have enough information to create a compelling resume.`;
 
-const SYSTEM_PROMPT = buildSystemPrompt(null);
-
-function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume, linkedInData }) {
+function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
   const getInitialMessage = () => {
     if (existingResume) {
       return "Welcome back! I can help you refine your existing resume or we can start fresh. What would you like to do?"
-    }
-    if (linkedInData) {
-      return `Hi! I'm May. I see you've provided your LinkedIn URL (${linkedInData.linkedinUrl}). I'll reference it as we go, but I'll need to ask you questions to build your resume properly. Let's start with the basics - what's your full name?`
     }
     return "Hi! I'm May, and I'm here to help you build an amazing resume. Let's start with the basics - what's your full name?"
   }
@@ -138,8 +115,7 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume, linke
         content: msg.content
       }))
 
-      const systemPrompt = buildSystemPrompt(linkedInData)
-      const response = await callClaude(apiKey, conversationHistory, systemPrompt)
+      const response = await callClaude(apiKey, conversationHistory, SYSTEM_PROMPT)
 
       // Check if Claude wants to generate the resume
       if (response.includes('"action": "generate_resume"')) {
