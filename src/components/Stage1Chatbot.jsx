@@ -73,6 +73,61 @@ When you're ready to generate the resume, respond with a JSON object in this EXA
 
 Continue the conversation naturally until you have enough information to create a compelling resume.`;
 
+const REVIEWER_SYSTEM_PROMPT = `You are an expert resume reviewer. Analyze this resume and provide concise, actionable feedback.
+
+EVALUATION CRITERIA:
+- ACTION VERBS: Strong, specific action verbs
+- METRICS: Quantifiable results and impact
+- CONCISENESS: Max 2 lines per bullet, clear writing
+- IMPACT: "did X by Y as shown by Z" framework
+- CLARITY: No vague statements
+
+OUTPUT FORMAT:
+## Overall Score: X/10
+
+## Quick Wins (2-3 easy improvements):
+[Bullet list of simple fixes]
+
+## Strongest Points (2-3):
+[What's working well]
+
+## Key Improvements Needed:
+[2-3 most important changes with specific examples]
+
+Keep it brief and actionable.`;
+
+function formatResumeForReview(resume) {
+  let text = `NAME: ${resume.name}\n\n`
+  text += `CONTACT:\nPhone: ${resume.contact.phone}\nEmail: ${resume.contact.email}\n`
+  if (resume.contact.linkedin) text += `LinkedIn: ${resume.contact.linkedin}\n`
+  text += `\n`
+
+  if (resume.education && resume.education.length > 0) {
+    text += `EDUCATION:\n`
+    resume.education.forEach(edu => {
+      text += `${edu.degree} - ${edu.institution}, ${edu.location} (${edu.dates})\n`
+      if (edu.details) text += `${edu.details}\n`
+    })
+    text += `\n`
+  }
+
+  if (resume.experience && resume.experience.length > 0) {
+    text += `EXPERIENCE:\n`
+    resume.experience.forEach(exp => {
+      text += `\n${exp.title} - ${exp.company}, ${exp.location} (${exp.dates})\n`
+      exp.bullets.forEach(bullet => {
+        text += `• ${bullet}\n`
+      })
+    })
+    text += `\n`
+  }
+
+  if (resume.skills) text += `SKILLS:\n${resume.skills}\n\n`
+  if (resume.additional) text += `ADDITIONAL:\n${resume.additional}\n`
+
+  return text
+}
+
 function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
   const getInitialMessage = () => {
     if (existingResume) {
@@ -90,6 +145,9 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isReviewing, setIsReviewing] = useState(false)
+  const [review, setReview] = useState(null)
+  const [generatedResumeData, setGeneratedResumeData] = useState(null)
   const chatEndRef = useRef(null)
 
   useEffect(() => {
@@ -135,8 +193,21 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
             // Generate DOCX
             await generateDOCX(resumeData.data)
 
-            // Save resume data and move to next stage
-            onResumeComplete(resumeData.data)
+            // Save resume data for review
+            setGeneratedResumeData(resumeData.data)
+            setIsGenerating(false)
+            setIsReviewing(true)
+
+            // Get AI review
+            const reviewPrompt = formatResumeForReview(resumeData.data)
+            const reviewResponse = await callClaude(
+              apiKey,
+              [{ role: 'user', content: `Please review this resume and provide detailed feedback:\n\n${reviewPrompt}` }],
+              REVIEWER_SYSTEM_PROMPT
+            )
+
+            setReview(reviewResponse)
+            setIsReviewing(false)
           }
         } catch (error) {
           console.error('Error parsing resume data:', error)
@@ -170,6 +241,57 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
           <p style={{ color: '#666', fontSize: '18px' }}>
             Creating your professional resume document...
           </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isReviewing) {
+    return (
+      <div className="container">
+        <div className="header">
+          <div className="logo">May</div>
+          <p className="tagline">Reviewing Your Resume...</p>
+        </div>
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div className="loading" style={{ width: '60px', height: '60px', margin: '0 auto 20px' }}></div>
+          <p style={{ color: '#666', fontSize: '18px' }}>
+            Analyzing your resume quality...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (review && generatedResumeData) {
+    return (
+      <div className="container" style={{ maxWidth: '900px' }}>
+        <div className="page-header">
+          <h1 className="page-title">Resume Created Successfully! 🎉</h1>
+          <p className="page-subtitle">Your resume has been downloaded. Here's May's feedback:</p>
+        </div>
+
+        <div className="card">
+          <div className="card-title">AI Review Feedback</div>
+          <div style={{
+            whiteSpace: 'pre-wrap',
+            lineHeight: '1.8',
+            color: 'var(--text-primary)',
+            marginBottom: 'var(--space-lg)'
+          }}>
+            {review}
+          </div>
+
+          <div className="button-group">
+            <button
+              className="btn btn-secondary"
+              onClick={() => {
+                onResumeComplete(generatedResumeData)
+              }}
+            >
+              Done
+            </button>
+          </div>
         </div>
       </div>
     )

@@ -5,7 +5,9 @@ import {
   TextRun,
   AlignmentType,
   LevelFormat,
-  BorderStyle
+  BorderStyle,
+  TabStopType,
+  TabStopPosition
 } from 'docx'
 import { saveAs } from 'file-saver'
 
@@ -61,27 +63,39 @@ export async function generateDOCX(resumeData, filename = 'resume.docx') {
         children: [
           // Header: Name
           new Paragraph({
-            alignment: AlignmentType.RIGHT,
+            alignment: AlignmentType.CENTER,
             children: [
               new TextRun({
                 text: resumeData.name.toUpperCase(),
                 bold: true,
-                size: 24 // 12pt
+                size: 28 // 14pt - bigger for name
               })
             ],
-            spacing: { after: 100 }
+            spacing: { after: 80 }
           }),
 
           // Contact info
           new Paragraph({
-            alignment: AlignmentType.RIGHT,
+            alignment: AlignmentType.CENTER,
             children: [
               new TextRun({
-                text: `${resumeData.contact.phone}, ${resumeData.contact.email}`,
+                text: `${resumeData.contact.phone} | ${resumeData.contact.email}`,
                 size: 20 // 10pt
               })
             ],
-            spacing: { after: 200 },
+            spacing: { after: 240 }
+          }),
+
+          // Education Section Header
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'EDUCATION',
+                bold: true,
+                size: 22
+              })
+            ],
+            spacing: { after: 120 },
             border: {
               bottom: {
                 color: '000000',
@@ -92,10 +106,30 @@ export async function generateDOCX(resumeData, filename = 'resume.docx') {
             }
           }),
 
-          // Education Section
+          // Education entries
           ...generateEducationSection(resumeData.education),
 
-          // Experience Section
+          // Experience Section Header
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: 'EXPERIENCE',
+                bold: true,
+                size: 22
+              })
+            ],
+            spacing: { before: 240, after: 120 },
+            border: {
+              bottom: {
+                color: '000000',
+                space: 1,
+                style: BorderStyle.SINGLE,
+                size: 6
+              }
+            }
+          }),
+
+          // Experience entries
           ...generateExperienceSection(resumeData.experience),
 
           // Skills/Additional Info Section
@@ -115,8 +149,8 @@ function generateEducationSection(education) {
 
   const elements = []
 
-  education.forEach((edu, index) => {
-    // Institution name and location
+  education.forEach((edu) => {
+    // Institution name (left) and location (right) on same line
     elements.push(
       new Paragraph({
         children: [
@@ -124,49 +158,50 @@ function generateEducationSection(education) {
             text: edu.institution.toUpperCase(),
             bold: true,
             size: 22
-          })
-        ],
-        spacing: { before: index === 0 ? 240 : 200, after: 80 }
-      })
-    )
-
-    // Location (right-aligned on same conceptual line)
-    elements.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [
+          }),
+          new TextRun({
+            text: '\t',
+            size: 22
+          }),
           new TextRun({
             text: edu.location,
             size: 22
           })
         ],
-        spacing: { before: 0, after: 80 }
+        tabStops: [
+          {
+            type: TabStopType.RIGHT,
+            position: TabStopPosition.MAX
+          }
+        ],
+        spacing: { before: 160, after: 80 }
       })
     )
 
-    // Degree and dates
+    // Degree (left) and dates (right) on same line
     elements.push(
       new Paragraph({
         children: [
           new TextRun({
             text: edu.degree,
             size: 22
-          })
-        ],
-        spacing: { after: 80 }
-      })
-    )
-
-    elements.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [
+          }),
+          new TextRun({
+            text: '\t',
+            size: 22
+          }),
           new TextRun({
             text: edu.dates,
             size: 22
           })
         ],
-        spacing: { after: edu.details ? 80 : 200 }
+        tabStops: [
+          {
+            type: TabStopType.RIGHT,
+            position: TabStopPosition.MAX
+          }
+        ],
+        spacing: { after: edu.details ? 80 : 160 }
       })
     )
 
@@ -177,10 +212,11 @@ function generateEducationSection(education) {
           children: [
             new TextRun({
               text: edu.details,
-              size: 22
+              size: 22,
+              italics: true
             })
           ],
-          spacing: { after: 200 }
+          spacing: { after: 160 }
         })
       )
     }
@@ -194,8 +230,8 @@ function generateExperienceSection(experience) {
 
   const elements = []
 
-  experience.forEach((exp, index) => {
-    // Company name and location
+  experience.forEach((exp) => {
+    // Company name (left) and location (right) on same line
     elements.push(
       new Paragraph({
         children: [
@@ -203,48 +239,51 @@ function generateExperienceSection(experience) {
             text: exp.company.toUpperCase(),
             bold: true,
             size: 22
-          })
-        ],
-        spacing: { before: index === 0 ? 240 : 200, after: 80 }
-      })
-    )
-
-    elements.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [
+          }),
+          new TextRun({
+            text: '\t',
+            size: 22
+          }),
           new TextRun({
             text: exp.location,
             size: 22
           })
         ],
-        spacing: { before: 0, after: 80 }
+        tabStops: [
+          {
+            type: TabStopType.RIGHT,
+            position: TabStopPosition.MAX
+          }
+        ],
+        spacing: { before: 160, after: 80 }
       })
     )
 
-    // Title and dates
+    // Title (left) and dates (right) on same line
     elements.push(
       new Paragraph({
         children: [
           new TextRun({
             text: exp.title,
+            size: 22,
+            italics: true
+          }),
+          new TextRun({
+            text: '\t',
             size: 22
-          })
-        ],
-        spacing: { after: 80 }
-      })
-    )
-
-    elements.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [
+          }),
           new TextRun({
             text: exp.dates,
             size: 22
           })
         ],
-        spacing: { after: 160 }
+        tabStops: [
+          {
+            type: TabStopType.RIGHT,
+            position: TabStopPosition.MAX
+          }
+        ],
+        spacing: { after: 120 }
       })
     )
 
@@ -263,7 +302,7 @@ function generateExperienceSection(experience) {
                 size: 22
               })
             ],
-            spacing: { after: 120 }
+            spacing: { after: 100 }
           })
         )
       })
@@ -298,7 +337,7 @@ function generateSkillsSection(skills) {
         new TextRun({
           text: 'Technical & Software: ',
           size: 22,
-          italics: true
+          bold: true
         }),
         new TextRun({
           text: skills,
