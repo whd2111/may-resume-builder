@@ -40,3 +40,4 @@ lerna-debug.log*
 api-keys.txt
 *.key
 .vercel
+.env

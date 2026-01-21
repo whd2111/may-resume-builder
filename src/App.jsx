@@ -6,8 +6,8 @@ import TailorJobs from './components/TailorJobs'
 import ResumeReviewer from './components/ResumeReviewer'
 
 function App() {
-  // Hardcoded API key
-  const apiKey = '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'
+  // Get API key from environment variable
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
 
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review'
   const [masterResume, setMasterResume] = useState(null)
