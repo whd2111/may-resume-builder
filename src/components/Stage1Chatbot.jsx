@@ -76,6 +76,7 @@ Continue the conversation naturally until you have enough information to create 
 const REVIEWER_SYSTEM_PROMPT = `You are an expert resume reviewer. Analyze this resume and provide concise, actionable feedback.
 
 EVALUATION CRITERIA:
+- LENGTH: CRITICAL - Resume MUST fit on ONE PAGE. Count total lines/content and flag if it exceeds 1 page.
 - ACTION VERBS: Strong, specific action verbs
 - METRICS: Quantifiable results and impact
 - CONCISENESS: Max 2 lines per bullet, clear writing
@@ -84,6 +85,9 @@ EVALUATION CRITERIA:
 
 OUTPUT FORMAT:
 ## Overall Score: X/10
+
+## ⚠️ CRITICAL ISSUES (if any):
+[MUST flag if resume is longer than 1 page - this is the #1 priority]
 
 ## Quick Wins (2-3 easy improvements):
 [Bullet list of simple fixes]

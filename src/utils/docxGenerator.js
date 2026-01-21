@@ -11,7 +11,14 @@ import {
 } from 'docx'
 import { saveAs } from 'file-saver'
 
-export async function generateDOCX(resumeData, filename = 'resume.docx') {
+export async function generateDOCX(resumeData, filename = null) {
+  // Auto-generate filename if not provided
+  if (!filename) {
+    const nameParts = resumeData.name.trim().split(' ')
+    const lastName = nameParts[nameParts.length - 1].toUpperCase()
+    const firstName = nameParts[0].toUpperCase()
+    filename = `${lastName}_${firstName}_RESUME_MAIN.docx`
+  }
   // Create the document with US Letter page size
   const doc = new Document({
     styles: {
