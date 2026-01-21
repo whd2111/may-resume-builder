@@ -99,7 +99,7 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume, linke
       return "Welcome back! I can help you refine your existing resume or we can start fresh. What would you like to do?"
     }
     if (linkedInData) {
-      return `Hi! I'm May. I see you've provided your LinkedIn profile. I've reviewed your background. Let's verify a few things and dive deeper into your accomplishments to create an outstanding resume. What's your full name?`
+      return `Hi! I'm May. I see you've provided your LinkedIn URL (${linkedInData.linkedinUrl}). I'll reference it as we go, but I'll need to ask you questions to build your resume properly. Let's start with the basics - what's your full name?`
     }
     return "Hi! I'm May, and I'm here to help you build an amazing resume. Let's start with the basics - what's your full name?"
   }
