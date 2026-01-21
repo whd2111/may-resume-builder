@@ -7,7 +7,7 @@ import ResumeReviewer from './components/ResumeReviewer'
 
 function App() {
   // Hardcoded API key
-  const apiKey = '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'
+  const apiKey = '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'
 
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review'
   const [masterResume, setMasterResume] = useState(null)
