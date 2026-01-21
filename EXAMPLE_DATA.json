@@ -1,0 +1,69 @@
+{
+  "description": "Example resume data structure that May generates and stores",
+  "masterResume": {
+    "name": "Will Dubbs",
+    "contact": {
+      "phone": "917-751-6583",
+      "email": "WDubbs26@gsb.columbia.edu",
+      "linkedin": "linkedin.com/in/willdubbs"
+    },
+    "education": [
+      {
+        "institution": "Columbia Business School",
+        "degree": "MBA, Product Management (Data Analysis & AI)",
+        "location": "New York, NY",
+        "dates": "2024 – 2026",
+        "details": ""
+      },
+      {
+        "institution": "Wesleyan University",
+        "degree": "BA, Government (Dean's List)",
+        "location": "Middletown, CT",
+        "dates": "2010 - 2014",
+        "details": ""
+      }
+    ],
+    "experience": [
+      {
+        "company": "Electronic Arts",
+        "title": "Product Management and Innovation MBA Intern – Ads and Sponsorships Team",
+        "location": "New York, NY",
+        "dates": "2025",
+        "bullets": [
+          "Built Python + LLM Reddit AI Agent tool analyzing 4,685+ users, enabling $500K in new sponsorship deals by quantifying previously unmeasurable customer insights",
+          "Standardized AI-powered social listening across 4 platforms during CFB26 launch, quantifying sponsor performance impact of 250K-5M additional brand views, leading to adoption by live service ad-tech teams",
+          "Automated social listening workflows, resulting in enhanced reporting for 7 sponsors and $20k savings"
+        ]
+      },
+      {
+        "company": "Civic (AI GovTech Startup)",
+        "title": "MBA Intern – AI Product Manager",
+        "location": "New York, NY",
+        "dates": "2025",
+        "bullets": [
+          "Led visual design for Customer Support portal and AI-powered content discovery system, establishing design language and interactive Figma prototype for AI GovTech start up",
+          "Led 5 user interviews and feedback loops to validate hypotheses and designed product roadmap to guide launch strategy"
+        ]
+      },
+      {
+        "company": "Ginkgo Bioworks",
+        "title": "Associate Director, Commercial Operations - Bioinformatics Product Manager",
+        "location": "Boston, MA",
+        "dates": "2023 - 2024",
+        "bullets": [
+          "Managed cross-functional team of 15 across product, engineering, and operations, securing 3 pilot contracts for disruptive biosecurity international public health products including AI powered genomic analysis",
+          "Developed 0-to-1 product strategy through customer interviews and supply chain financial analysis, reducing operational costs by 10% and preventing $10K+ revenue loss through improved logistics",
+          "Built multi-year value proposition analysis, securing leadership buy-in and Ukrainian support, resulting in $1.6M annual renewals"
+        ]
+      }
+    ],
+    "skills": "Python, SQL, R, Asana, Figma, Adobe Creative Suite, Tableau, Excel, PowerPoint, Agile, A/B Testing",
+    "additional": ""
+  },
+  "notes": [
+    "This structure is stored in localStorage under 'may_master_resume'",
+    "The chatbot builds this incrementally through conversation",
+    "Stage 2 takes this structure and tailors it for specific jobs",
+    "The DOCX generator uses this exact structure to create Word documents"
+  ]
+}
