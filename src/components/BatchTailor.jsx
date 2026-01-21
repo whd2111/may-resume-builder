@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 
-const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a master resume and customize it for a specific job posting.
+const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
 TAILORING RULES:
 1. Keep all experience truthful - never fabricate or exaggerate
@@ -11,7 +11,7 @@ TAILORING RULES:
 4. Emphasize skills and accomplishments that match the job requirements
 5. Remove or de-emphasize less relevant bullets if needed
 6. Maintain strong action verbs and metrics
-7. Keep the same format and structure as the master resume
+7. Keep the same format and structure as the primary 1-page resume
 
 IMPORTANT: Return the tailored resume in the SAME JSON format as the input, with the same structure. Only modify the content, not the format.
 
@@ -37,7 +37,7 @@ function BatchTailor({ apiKey, masterResume, onBack }) {
 
   const handleBatchTailor = async () => {
     if (!masterResume) {
-      setError('No master resume found. Please build a resume first.')
+      setError('No primary 1-page resume found. Please build a resume first.')
       return
     }
 
@@ -71,7 +71,7 @@ function BatchTailor({ apiKey, masterResume, onBack }) {
 
         try {
           // Call Claude to tailor the resume
-          const prompt = `Here is the master resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${jobDesc}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
+          const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${jobDesc}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
 
           const response = await callClaude(
             apiKey,
@@ -137,7 +137,7 @@ function BatchTailor({ apiKey, masterResume, onBack }) {
         <div className="card">
           <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
             <div className="info-box-text" style={{ color: '#c92a2a' }}>
-              No master resume found. Please build a resume first before tailoring.
+              No primary 1-page resume found. Please build a resume first before tailoring.
             </div>
           </div>
           <button className="btn btn-secondary" onClick={onBack} style={{ marginTop: 'var(--space-lg)' }}>

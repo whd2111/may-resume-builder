@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 
-const SYSTEM_PROMPT = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their master resume.
+const SYSTEM_PROMPT = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their primary 1-page resume.
 
 CRITICAL: Track what information you've already collected. Do NOT ask for information the user has already provided.
 
@@ -127,7 +127,7 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
 
             setMessages(prev => [...prev, {
               role: 'assistant',
-              content: "Perfect! I have all the information I need. Let me generate your master resume..."
+              content: "Perfect! I have all the information I need. Let me generate your primary 1-page resume..."
             }])
 
             setIsGenerating(true)

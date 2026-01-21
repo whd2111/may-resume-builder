@@ -39,7 +39,7 @@ function TailorJobs({ apiKey, masterResume, onBack }) {
         <div className="card">
           <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
             <div className="info-box-text" style={{ color: '#c92a2a' }}>
-              No master resume found. Please build a resume first before tailoring.
+              No primary 1-page resume found. Please build a resume first before tailoring.
             </div>
           </div>
           <button className="btn btn-secondary" onClick={onBack} style={{ marginTop: 'var(--space-lg)' }}>

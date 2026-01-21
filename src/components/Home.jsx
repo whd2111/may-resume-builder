@@ -13,7 +13,7 @@ function Home({ onNavigate }) {
           <span className="action-card-icon">✨</span>
           <h2 className="action-card-title">Build Your Resume</h2>
           <p className="action-card-description">
-            Create your master resume from scratch or upload an existing one to improve. May will use best practices to craft a compelling professional resume.
+            Create your primary 1-page resume from scratch or upload an existing one to improve. May will use best practices to craft a compelling professional resume.
           </p>
         </div>
 

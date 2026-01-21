@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 
-const TAILORING_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's master resume and a job description. Your task is to tailor the resume bullets to align with the job requirements while maintaining truthfulness.
+const TAILORING_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary 1-page resume and a job description. Your task is to tailor the resume bullets to align with the job requirements while maintaining truthfulness.
 
 TAILORING RULES:
 1. Analyze the job description for key skills, requirements, and keywords
@@ -54,7 +54,7 @@ function Stage2Tailor({ apiKey, masterResume, onBack }) {
     setExplanation('')
 
     try {
-      const prompt = `Here is the master resume data:
+      const prompt = `Here is the primary 1-page resume data:
 ${JSON.stringify(masterResume, null, 2)}
 
 Here is the job description:
@@ -92,7 +92,7 @@ Please tailor this resume for the job description.`
   const handleDownloadMaster = async () => {
     try {
       await generateDOCX(masterResume, 'master_resume.docx')
-      alert('Master resume downloaded successfully!')
+      alert('Primary 1-page resume downloaded successfully!')
     } catch (error) {
       alert(`Error generating document: ${error.message}`)
     }
@@ -110,14 +110,14 @@ Please tailor this resume for the job description.`
         <p className="page-subtitle">
           {masterResume
             ? "Paste any job description below and May will customize your resume for that role"
-            : "You need to build a master resume first before tailoring"}
+            : "You need to build a primary 1-page resume first before tailoring"}
         </p>
       </div>
 
       {!masterResume && (
         <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
           <div className="info-box-text" style={{ color: '#c92a2a' }}>
-            No master resume found. Please build a resume first using the "Build a Resume" option.
+            No primary 1-page resume found. Please build a resume first using the "Build a Resume" option.
           </div>
         </div>
       )}
