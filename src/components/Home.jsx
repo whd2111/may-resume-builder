@@ -11,41 +11,25 @@ function Home({ onNavigate }) {
       <div className="action-cards">
         <div className="action-card" onClick={() => onNavigate('build')}>
           <span className="action-card-icon">✨</span>
-          <h2 className="action-card-title">Build a Resume</h2>
+          <h2 className="action-card-title">Build Your Resume</h2>
           <p className="action-card-description">
-            Start from scratch with our AI chatbot. May will ask strategic questions to extract your best accomplishments and create a professional resume.
-          </p>
-        </div>
-
-        <div className="action-card" onClick={() => onNavigate('update')}>
-          <span className="action-card-icon">📝</span>
-          <h2 className="action-card-title">Update Your Main Resume</h2>
-          <p className="action-card-description">
-            Upload your existing resume and let May rewrite it using best practices: action verbs, metrics, and the "did X by Y as shown by Z" framework.
+            Create your master resume from scratch or upload an existing one to improve. May will use best practices to craft a compelling professional resume.
           </p>
         </div>
 
         <div className="action-card" onClick={() => onNavigate('tailor')}>
           <span className="action-card-icon">🎯</span>
-          <h2 className="action-card-title">Tailor for a Specific Job</h2>
+          <h2 className="action-card-title">Tailor for Jobs</h2>
           <p className="action-card-description">
-            Already have a master resume? Paste any job description and May will customize your resume to match that specific role.
+            Customize your resume for specific roles. Paste one job description or multiple at once—May will create tailored versions for each.
           </p>
         </div>
 
         <div className="action-card" onClick={() => onNavigate('review')}>
           <span className="action-card-icon">🔍</span>
-          <h2 className="action-card-title">Review My Resume</h2>
+          <h2 className="action-card-title">Get Feedback</h2>
           <p className="action-card-description">
-            Get expert AI feedback on your resume. May will analyze action verbs, metrics, clarity, and provide specific suggestions for improvement.
-          </p>
-        </div>
-
-        <div className="action-card" onClick={() => onNavigate('batch')}>
-          <span className="action-card-icon">⚡</span>
-          <h2 className="action-card-title">Batch Tailor Resumes</h2>
-          <p className="action-card-description">
-            Applying to multiple jobs? Paste several job descriptions and May will create a tailored resume for each one automatically.
+            Get expert AI analysis of your resume quality. May will score each section and provide specific, actionable suggestions for improvement.
           </p>
         </div>
       </div>
