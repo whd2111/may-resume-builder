@@ -26,7 +26,7 @@ npm install
 
 3. Add your key to `.env`:
    ```
-   VITE_ANTHROPIC_API_KEY=sk-ant-api03-your-actual-key-here
+   VITE_ANTHROPIC=sk-ant-api03-your-actual-key-here
    ```
 
 ### 4. Run the development server
@@ -48,7 +48,7 @@ npm run build
 2. Click "Add New Project"
 3. Import `whd2111/may-resume-builder`
 4. Add environment variable:
-   - Key: `VITE_ANTHROPIC_API_KEY`
+   - Key: `VITE_ANTHROPIC`
    - Value: Your Anthropic API key
 5. Deploy
 

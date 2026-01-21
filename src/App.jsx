@@ -7,7 +7,7 @@ import ResumeReviewer from './components/ResumeReviewer'
 
 function App() {
   // Get API key from environment variable
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+  const apiKey = import.meta.env.VITE_ANTHROPIC
 
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review'
   const [masterResume, setMasterResume] = useState(null)
