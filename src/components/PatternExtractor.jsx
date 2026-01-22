@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import { callClaude } from '../utils/claudeApi'
 import { ArrowLeftIcon, CheckIcon } from '../utils/icons'
 
+// Note: Pattern extraction works without authentication
+// Resume bank is password-protected in UI
+
 const PATTERN_EXTRACTION_PROMPT = `You are an expert resume analyst. Analyze these high-quality resumes and extract actionable patterns.
 
 Extract and categorize:

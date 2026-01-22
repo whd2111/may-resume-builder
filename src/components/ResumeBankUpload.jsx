@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import { callClaude } from '../utils/claudeApi'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
@@ -45,7 +44,6 @@ Respond with JSON in this EXACT format:
 }`
 
 function ResumeBankUpload({ onBack }) {
-  const { user } = useAuth()
   const [files, setFiles] = useState([])
   const [processing, setProcessing] = useState(false)
   const [results, setResults] = useState([])
@@ -118,11 +116,11 @@ function ResumeBankUpload({ onBack }) {
 
       const parsed = JSON.parse(jsonMatch[0])
 
-      // Store in Supabase
+      // Store in Supabase (no user ID required - password protected in UI)
       const { data, error } = await supabase
         .from('resume_bank')
         .insert({
-          uploaded_by: user?.id,
+          uploaded_by: null,
           resume_data: parsed.resume_data,
           original_text: resumeText,
           source_filename: file.name,
