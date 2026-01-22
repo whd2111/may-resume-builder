@@ -133,23 +133,104 @@ Please tailor this resume for the job description.`
 
       {masterResume && (
         <>
-          <form onSubmit={handleTailor}>
-            <div className="input-group">
-              <label htmlFor="jobDescription">Job Description</label>
-              <textarea
-                id="jobDescription"
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                placeholder="Paste the full job description here..."
-                required
-                rows={10}
-              />
-            </div>
+          {!tailoredResume && !isLoading && (
+            <div className="card">
+              <div className="card-title">Paste Job Description</div>
+              <p style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-secondary)', fontSize: '15px' }}>
+                Copy the full job posting from LinkedIn, Indeed, or company website and paste it below. May will analyze the requirements and customize your resume to match.
+              </p>
 
-            <button type="submit" className="button" disabled={isLoading || !jobDescription.trim()}>
-              {isLoading ? 'Tailoring Resume...' : 'Tailor Resume'}
-            </button>
-          </form>
+              <form onSubmit={handleTailor}>
+                <div style={{ position: 'relative', marginBottom: 'var(--space-md)' }}>
+                  <textarea
+                    id="jobDescription"
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    placeholder="Paste the full job description here...&#10;&#10;Include:&#10;• Job title and company&#10;• Responsibilities&#10;• Required qualifications&#10;• Preferred skills&#10;• Any other relevant details"
+                    required
+                    style={{
+                      width: '100%',
+                      minHeight: '350px',
+                      padding: 'var(--space-md)',
+                      paddingRight: '50px',
+                      fontSize: '15px',
+                      lineHeight: '1.6',
+                      fontFamily: 'inherit',
+                      border: jobDescription.trim() ? '2px solid #3b82f6' : '2px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      resize: 'vertical',
+                      transition: 'border-color 0.2s',
+                      background: jobDescription.trim() ? '#f0f9ff' : '#ffffff'
+                    }}
+                  />
+
+                  {jobDescription.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setJobDescription('')}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        color: '#666',
+                        background: '#f3f4f6',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = '#e5e7eb'
+                        e.target.style.color = '#333'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = '#f3f4f6'
+                        e.target.style.color = '#666'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {jobDescription.trim() && (
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#059669',
+                    marginBottom: 'var(--space-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>✓</span>
+                    <span>{jobDescription.trim().split(/\s+/).length} words • {jobDescription.length} characters</span>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!jobDescription.trim()}
+                  style={{ width: '100%', fontSize: '16px', padding: '14px' }}
+                >
+                  Tailor Resume for This Job →
+                </button>
+              </form>
+
+              <div className="info-box" style={{ marginTop: 'var(--space-lg)' }}>
+                <div className="info-box-title">💡 Tips for best results:</div>
+                <div className="info-box-text">
+                  • Include the complete job posting (don't just paste the title)
+                  <br />
+                  • More detail = better tailoring
+                  <br />
+                  • May will preserve all facts while emphasizing relevant skills
+                </div>
+              </div>
+            </div>
+          )}
 
           {isLoading && (
             <div style={{ textAlign: 'center', padding: '40px' }}>

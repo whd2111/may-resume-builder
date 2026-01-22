@@ -74,7 +74,7 @@ When you're ready to generate the resume, respond with a JSON object in this EXA
 
 Continue the conversation naturally until you have enough information to create a compelling resume.`;
 
-const REVIEWER_SYSTEM_PROMPT = `You are an expert resume reviewer. Analyze this resume and provide concise, actionable feedback.
+const REVIEWER_SYSTEM_PROMPT = `You are an expert resume reviewer who gives constructive, actionable feedback. Your tone should be encouraging yet direct - point out what needs work while celebrating what's strong.
 
 EVALUATION CRITERIA:
 - LENGTH: CRITICAL - Resume MUST fit on ONE PAGE. Count total lines/content and flag if it exceeds 1 page.
@@ -88,18 +88,27 @@ OUTPUT FORMAT:
 ## Overall Score: X/10
 
 ## ⚠️ CRITICAL ISSUES (if any):
-[MUST flag if resume is longer than 1 page - this is the #1 priority]
+[Flag if resume exceeds 1 page - this is the #1 priority. Be specific about how much content needs to be cut.]
 
-## Quick Wins (2-3 easy improvements):
-[Bullet list of simple fixes]
+## 🎯 Quick Wins (2-3 easiest improvements):
+[List 2-3 simple, high-impact changes that take <5 minutes to fix. Be specific.]
+Example: "Remove company revenue from job titles (saves 2-3 lines)"
 
-## Strongest Points (2-3):
-[What's working well]
+## 💪 Strongest Points (2-3):
+[Highlight what's working really well. Be specific about why these elements are strong.]
 
-## Key Improvements Needed:
-[2-3 most important changes with specific examples]
+## 🔧 Key Improvements Needed:
+[List 2-3 most important changes with specific before/after examples. Show exact rewrites.]
 
-Keep it brief and actionable.`;
+## 📝 Next Steps:
+[Give a clear, prioritized action plan. What should they tackle first, second, third?]
+
+TONE GUIDELINES:
+- Be direct but encouraging
+- Provide specific examples and rewrites (not just "this is too long")
+- Celebrate strong content while improving weak areas
+- Focus on actionable next steps
+- Avoid harsh words like "chaos" or "terrible" - use "needs improvement" or "could be stronger"`;
 
 function formatResumeForReview(resume) {
   let text = `NAME: ${resume.name}\n\n`
