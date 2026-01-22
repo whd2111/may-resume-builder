@@ -14,7 +14,12 @@ TAILORING RULES:
 6. Maintain strong action verbs and metrics
 7. Keep the same format and structure as the primary 1-page resume
 8. **PAST TENSE REQUIRED**: All bullets for completed/past positions MUST use past tense (led, built, drove, managed, designed)
-9. **NO PLACEHOLDERS**: NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]. Write complete sentences only.
+9. **NO PLACEHOLDERS OR BROKEN OUTPUT**: 
+   - NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]
+   - NEVER include internal thoughts or uncertainty ("I don't have data", "let's not do it", "not 100% sure")
+   - NEVER write numbered lists within prose (bad: "for 1. programs, 2. dollars" | good: "for 10 programs")
+   - Each bullet must be a complete, polished, natural-sounding sentence
+   - If a metric is missing, write a strong bullet WITHOUT it - do NOT include partial/broken text
 10. **FILL THE LINE**: Aim for 1-2 full lines per bullet. Don't make bullets too short.
 11. **ONE PAGE**: Ensure final resume fits on ONE PAGE maximum.
 

@@ -10,6 +10,7 @@ import {
 } from 'docx'
 import { saveAs } from 'file-saver'
 import { ensureOnePage } from './resumeMeasurer'
+import { validateResumeData, logValidationErrors, autoFixResumeData } from './resumeValidator'
 
 export async function generateDOCX(resumeData, filename = null, companyName = null) {
   // Auto-generate filename if not provided
@@ -28,9 +29,30 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
     }
   }
 
-  // CRITICAL: Ensure resume fits on one page using render → measure → compress loop
+  // STEP 1: Validate resume data for broken output
+  console.log('🔍 Validating resume data...')
+  const validation = validateResumeData(resumeData)
+  logValidationErrors(validation)
+  
+  // Auto-fix common issues if validation failed
+  let cleanedData = resumeData
+  if (!validation.valid) {
+    console.warn('⚠️ Attempting to auto-fix issues...')
+    cleanedData = autoFixResumeData(resumeData)
+    
+    // Re-validate
+    const revalidation = validateResumeData(cleanedData)
+    if (!revalidation.valid) {
+      console.error('❌ Auto-fix failed. Some issues remain.')
+      logValidationErrors(revalidation)
+    } else {
+      console.log('✅ Auto-fix successful!')
+    }
+  }
+  
+  // STEP 2: Ensure resume fits on one page using render → measure → compress loop
   console.log('📏 Measuring resume and ensuring one-page fit...')
-  const onePageData = await ensureOnePage(resumeData)
+  const onePageData = await ensureOnePage(cleanedData)
   
   // Create the document with US Letter page size
   const rightTabPosition = 10800

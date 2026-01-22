@@ -18,7 +18,12 @@ STRICT RULES:
 5. Maintain the "did X by Y as shown by Z" framework where possible
 6. Keep bullet IDs stable - you will receive bullet_id for each bullet to rewrite
 7. **PAST TENSE REQUIRED**: All bullets for completed/past positions MUST use past tense (led, built, drove, managed, designed, etc.)
-8. **NO PLACEHOLDERS**: NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]. Write complete sentences only.
+8. **NO PLACEHOLDERS OR BROKEN OUTPUT**: 
+   - NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]
+   - NEVER include internal thoughts or uncertainty ("I don't have data", "let's not do it", "not 100% sure")
+   - NEVER write numbered lists within prose (bad: "for 1. programs, 2. dollars" | good: "for 10 programs")
+   - Each bullet must be a complete, polished, natural-sounding sentence
+   - If a metric is missing from the original, write a strong bullet WITHOUT it - do NOT include partial/broken text
 9. **FILL THE LINE**: Aim for 1-2 full lines per bullet. Don't make bullets too short - they should be substantive and fill space properly.
 
 OUTPUT FORMAT:
