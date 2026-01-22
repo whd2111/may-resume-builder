@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Stage2Tailor from './Stage2Tailor'
 import BatchTailor from './BatchTailor'
-import { ArrowLeftIcon, TargetIcon, SparklesIcon } from '../utils/icons'
+import { ArrowLeftIcon, TargetIcon, WritingIcon } from '../utils/icons'
 
 function TailorJobs({ primaryResume, onBack }) {
   const [mode, setMode] = useState(null) // null, 'single', 'batch'
@@ -80,7 +80,7 @@ function TailorJobs({ primaryResume, onBack }) {
 
         <div className="action-card stagger-2" onClick={() => setMode('batch')}>
           <span className="action-card-icon">
-            <SparklesIcon />
+            <WritingIcon />
           </span>
           <h2 className="action-card-title">Multiple Jobs</h2>
           <p className="action-card-description">

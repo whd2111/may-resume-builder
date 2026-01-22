@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import MetricPrompter from './MetricPrompter'
-import { ArrowLeftIcon, SendIcon, SparklesIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, SendIcon, WritingIcon, DownloadIcon } from '../utils/icons'
 
 // ... existing prompts ...
 
@@ -305,7 +305,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
         </div>
         <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
           <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
-            <SparklesIcon />
+            <WritingIcon />
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
             Creating your professional resume document...
@@ -325,7 +325,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
         </div>
         <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
           <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
-            <SparklesIcon />
+            <WritingIcon />
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
             Analyzing your resume quality...
@@ -346,7 +346,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
 
         <div className="card-premium">
           <div className="card-title">
-            <SparklesIcon />
+            <WritingIcon />
             AI Review Feedback
           </div>
           <div style={{

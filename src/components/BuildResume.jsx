@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Stage1Chatbot from './Stage1Chatbot'
 import ResumeUpload from './ResumeUpload'
-import { ArrowLeftIcon, SparklesIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, WritingIcon, DownloadIcon } from '../utils/icons'
 
 function BuildResume({ onResumeComplete, onBack, existingResume }) {
   const [mode, setMode] = useState(null) // null, 'chat', 'upload'
@@ -43,7 +43,7 @@ function BuildResume({ onResumeComplete, onBack, existingResume }) {
       <div className="action-cards" style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div className="action-card stagger-1" onClick={() => setMode('chat')}>
           <span className="action-card-icon">
-            <SparklesIcon />
+            <WritingIcon />
           </span>
           <h2 className="action-card-title">Start from Scratch</h2>
           <p className="action-card-description">

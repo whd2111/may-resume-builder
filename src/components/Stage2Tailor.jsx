@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
-import { ArrowLeftIcon, TargetIcon, SparklesIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon } from '../utils/icons'
 
 // ... existing prompts ...
 
@@ -201,7 +201,7 @@ Please tailor this resume for the job description.`
                   disabled={!jobDescription.trim()}
                   style={{ width: '100%' }}
                 >
-                  <SparklesIcon />
+                  <WritingIcon />
                   Tailor Resume Now
                 </button>
               </form>
@@ -224,7 +224,7 @@ Please tailor this resume for the job description.`
             <div className="stagger-1">
               <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
                 <div className="card-title" style={{ color: '#065f46' }}>
-                  <SparklesIcon />
+                  <WritingIcon />
                   Tailoring Complete
                 </div>
                 <p style={{ color: '#065f46', fontSize: '15px', lineHeight: '1.6' }}>{explanation}</p>

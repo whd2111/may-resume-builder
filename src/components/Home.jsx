@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import '../App.css'
-import { SparklesIcon, TargetIcon, SearchIcon } from '../utils/icons'
+import { WritingIcon, TargetIcon, SearchIcon } from '../utils/icons'
 import { useAuth } from '../contexts/AuthContext'
 import AuthModal from './auth/AuthModal'
 
@@ -70,7 +70,7 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
       <div className="action-cards">
         <div className="action-card stagger-1" onClick={() => onNavigate('build')}>
           <span className="action-card-icon">
-            <SparklesIcon />
+            <WritingIcon />
           </span>
           <h2 className="action-card-title">Build Your Resume</h2>
           <p className="action-card-description">

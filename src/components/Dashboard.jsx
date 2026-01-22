@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useResumes } from '../hooks/useResumes'
 import { useStories } from '../hooks/useStories'
-import { ArrowLeftIcon, DownloadIcon, SparklesIcon, TargetIcon } from '../utils/icons'
+import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon } from '../utils/icons'
 import { generateDOCX } from '../utils/docxGenerator'
 
 export default function Dashboard({ onBack }) {
@@ -210,7 +210,7 @@ export default function Dashboard({ onBack }) {
           {resumes.length === 0 ? (
             <div className="card-premium" style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
               <span className="action-card-icon" style={{ margin: '0 auto var(--space-lg)' }}>
-                <SparklesIcon />
+                <WritingIcon />
               </span>
               <h2 style={{ fontSize: '24px', marginBottom: 'var(--space-sm)' }}>No resumes yet</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>
@@ -335,14 +335,14 @@ export default function Dashboard({ onBack }) {
             }}
             style={{ marginBottom: 'var(--space-xl)' }}
           >
-            <SparklesIcon />
+            <WritingIcon />
             Add New Story
           </button>
 
           {showAddStory && (
             <div className="card-premium" style={{ marginBottom: 'var(--space-xl)', borderLeft: '4px solid var(--accent-primary)' }}>
               <div className="card-title">
-                <SparklesIcon />
+                <WritingIcon />
                 {editingStory ? 'Edit Story' : 'Add New Story'}
               </div>
 
@@ -572,7 +572,7 @@ export default function Dashboard({ onBack }) {
           {stories.length === 0 && !showAddStory ? (
             <div className="card-premium" style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
               <span className="action-card-icon" style={{ margin: '0 auto var(--space-lg)' }}>
-                <SparklesIcon />
+                <WritingIcon />
               </span>
               <h2 style={{ fontSize: '24px', marginBottom: 'var(--space-sm)' }}>No stories yet</h2>
               <p style={{ color: 'var(--text-secondary)' }}>

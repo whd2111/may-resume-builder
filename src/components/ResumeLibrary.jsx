@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useResumes } from '../hooks/useResumes'
-import { ArrowLeftIcon, DownloadIcon, SparklesIcon, TargetIcon } from '../utils/icons'
+import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon } from '../utils/icons'
 import { generateDOCX } from '../utils/docxGenerator'
 
 export default function ResumeLibrary({ onBack, onSelectResume }) {
@@ -86,7 +86,7 @@ export default function ResumeLibrary({ onBack, onSelectResume }) {
           margin: '0 auto'
         }}>
           <span className="action-card-icon" style={{ margin: '0 auto var(--space-lg)' }}>
-            <SparklesIcon />
+            <WritingIcon />
           </span>
           <h2 style={{ fontSize: '24px', marginBottom: 'var(--space-sm)' }}>No resumes yet</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>

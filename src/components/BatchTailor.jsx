@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
-import { ArrowLeftIcon, SparklesIcon, TargetIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, WritingIcon, TargetIcon, DownloadIcon } from '../utils/icons'
 
 const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
@@ -173,7 +173,7 @@ function BatchTailor({ primaryResume, onBack }) {
         <>
           <div className="card-premium stagger-1" style={{ marginBottom: 'var(--space-lg)', background: 'white' }}>
             <div className="card-title" style={{ fontSize: '16px' }}>
-              <SparklesIcon />
+              <WritingIcon />
               How it works:
             </div>
             <div className="info-box-text" style={{ fontSize: '14px', lineHeight: '1.7' }}>
@@ -328,7 +328,7 @@ function BatchTailor({ primaryResume, onBack }) {
             style={{ width: '100%' }}
             disabled={jobs.every(j => !j.description.trim())}
           >
-            <SparklesIcon />
+            <WritingIcon />
             Generate {jobs.filter(j => j.description.trim()).length} Tailored Resume{jobs.filter(j => j.description.trim()).length !== 1 ? 's' : ''}
           </button>
         </>
@@ -384,7 +384,7 @@ function BatchTailor({ primaryResume, onBack }) {
         <div className="stagger-1">
           <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
             <div className="card-title" style={{ color: '#065f46' }}>
-              <SparklesIcon />
+              <WritingIcon />
               Batch Process Complete!
             </div>
             <p style={{ color: '#065f46', fontSize: '16px' }}>

@@ -3,7 +3,7 @@ import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import mammoth from 'mammoth'
 import MetricPrompter from './MetricPrompter'
-import { ArrowLeftIcon, DownloadIcon, SparklesIcon } from '../utils/icons'
+import { ArrowLeftIcon, DownloadIcon, WritingIcon } from '../utils/icons'
 
 // ... existing prompts ...
 
@@ -251,7 +251,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
                     <div className="loading"></div>
                   ) : (
                     <>
-                      <SparklesIcon />
+                      <WritingIcon />
                       Rewrite Resume
                     </>
                   )}
@@ -268,7 +268,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
 
           <div className="card-premium stagger-2">
             <div className="card-title">
-              <SparklesIcon />
+              <WritingIcon />
               What May will do:
             </div>
             <div className="info-box-text" style={{ fontSize: '15px', lineHeight: '1.8' }}>
@@ -286,7 +286,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
         <div className="stagger-1">
           <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
             <div className="card-title" style={{ color: '#065f46' }}>
-              <SparklesIcon />
+              <WritingIcon />
               Resume Rewritten!
             </div>
             <p style={{ color: '#065f46', fontSize: '15px' }}>{improvements}</p>

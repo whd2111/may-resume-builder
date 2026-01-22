@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
-import { ArrowLeftIcon, SearchIcon, SparklesIcon } from '../utils/icons'
+import { ArrowLeftIcon, SearchIcon, WritingIcon } from '../utils/icons'
 
 // ... existing prompts ...
 
@@ -192,7 +192,7 @@ function ResumeReviewer({ primaryResume, onBack }) {
             onClick={handleReview}
             style={{ width: '100%' }}
           >
-            <SparklesIcon />
+            <WritingIcon />
             Review My Resume
           </button>
         </div>
@@ -214,7 +214,7 @@ function ResumeReviewer({ primaryResume, onBack }) {
         <div className="stagger-1">
           <div className="card-premium">
             <div className="card-title">
-              <SparklesIcon />
+              <WritingIcon />
               Detailed Feedback
             </div>
             <div style={{
@@ -230,7 +230,7 @@ function ResumeReviewer({ primaryResume, onBack }) {
                 Back to Home
               </button>
               <button className="btn btn-primary" onClick={handleReview}>
-                <SparklesIcon />
+                <WritingIcon />
                 Refresh Review
               </button>
             </div>
