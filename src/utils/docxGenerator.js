@@ -23,7 +23,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
       const cleanCompany = companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')
       filename = `${lastName}_${firstName}_${cleanCompany}.docx`
     } else {
-      // For master resumes
+      // For primary resumes
       filename = `${lastName}_${firstName}_RESUME.docx`
     }
   }

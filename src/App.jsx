@@ -7,11 +7,12 @@ import BuildResume from './components/BuildResume'
 import TailorJobs from './components/TailorJobs'
 import ResumeReviewer from './components/ResumeReviewer'
 import ResumeLibrary from './components/ResumeLibrary'
+import Dashboard from './components/Dashboard'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
-  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library'
+  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard'
 
   // Show loading state while auth is initializing
   if (authLoading) {
@@ -90,6 +91,12 @@ function App() {
 
       {page === 'library' && (
         <ResumeLibrary
+          onBack={handleBack}
+        />
+      )}
+
+      {page === 'dashboard' && (
+        <Dashboard
           onBack={handleBack}
         />
       )}

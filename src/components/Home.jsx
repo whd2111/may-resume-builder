@@ -38,8 +38,8 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
               
               {showUserMenu && (
                 <div className="user-dropdown">
-                  <button onClick={() => { onNavigate('library'); setShowUserMenu(false); }}>
-                    My Resumes
+                  <button onClick={() => { onNavigate('dashboard'); setShowUserMenu(false); }}>
+                    Dashboard
                   </button>
                   <button onClick={handleSignOut}>Sign Out</button>
                 </div>
