@@ -3,6 +3,7 @@ import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import MetricPrompter from './MetricPrompter'
 import { ArrowLeftIcon, SendIcon, WritingIcon, DownloadIcon } from '../utils/icons'
+import { getMayKnowledge, buildEnhancedPrompt } from '../utils/patternQueries'
 
 // ... existing prompts ...
 
@@ -167,9 +168,82 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   const [review, setReview] = useState(null)
   const [generatedResumeData, setGeneratedResumeData] = useState(null)
   const chatEndRef = useRef(null)
+  
+  // Pattern system integration
+  const [learnedPatterns, setLearnedPatterns] = useState(null)
+  const [userContext, setUserContext] = useState({
+    industry: null,
+    role_level: null,
+    job_function: null
+  })
+  const [enhancedPrompt, setEnhancedPrompt] = useState(SYSTEM_PROMPT)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // Load learned patterns when user context changes
+  useEffect(() => {
+    async function loadPatterns() {
+      if (userContext.industry || userContext.job_function) {
+        try {
+          const knowledge = await getMayKnowledge(userContext)
+          setLearnedPatterns(knowledge)
+          
+          // Enhance the system prompt with learned patterns
+          const enhanced = buildEnhancedPrompt(SYSTEM_PROMPT, knowledge)
+          setEnhancedPrompt(enhanced)
+          
+          console.log('✅ Loaded patterns for:', userContext)
+        } catch (error) {
+          console.error('Error loading patterns:', error)
+          // Fallback to base prompt if pattern loading fails
+          setEnhancedPrompt(SYSTEM_PROMPT)
+        }
+      }
+    }
+    
+    loadPatterns()
+  }, [userContext])
+
+  // Detect user context from conversation
+  useEffect(() => {
+    const detectContext = () => {
+      const conversationText = messages.map(m => m.content).join(' ').toLowerCase()
+      
+      // Detect industry
+      const industries = ['tech', 'finance', 'consulting', 'healthcare', 'marketing']
+      const detectedIndustry = industries.find(ind => conversationText.includes(ind))
+      
+      // Detect role level
+      let roleLevel = null
+      if (conversationText.includes('senior') || conversationText.includes('lead')) {
+        roleLevel = 'senior'
+      } else if (conversationText.includes('junior') || conversationText.includes('entry')) {
+        roleLevel = 'entry'
+      } else if (conversationText.includes('mid-level') || conversationText.includes('associate')) {
+        roleLevel = 'mid'
+      }
+      
+      // Detect job function
+      const functions = ['engineering', 'product', 'marketing', 'sales', 'operations']
+      const detectedFunction = functions.find(func => conversationText.includes(func))
+      
+      // Update context if we detected something new
+      if (detectedIndustry && detectedIndustry !== userContext.industry) {
+        setUserContext(prev => ({ ...prev, industry: detectedIndustry }))
+      }
+      if (roleLevel && roleLevel !== userContext.role_level) {
+        setUserContext(prev => ({ ...prev, role_level: roleLevel }))
+      }
+      if (detectedFunction && detectedFunction !== userContext.job_function) {
+        setUserContext(prev => ({ ...prev, job_function: detectedFunction }))
+      }
+    }
+    
+    if (messages.length > 2) {
+      detectContext()
+    }
   }, [messages])
 
   const startReview = async (resumeData) => {
@@ -230,7 +304,8 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
         content: msg.content
       }))
 
-      const response = await callClaude(null, conversationHistory, SYSTEM_PROMPT)
+      // Use enhanced prompt with learned patterns
+      const response = await callClaude(null, conversationHistory, enhancedPrompt)
 
       // Check if Claude wants to generate the resume
       if (response.includes('"action": "generate_resume"')) {
