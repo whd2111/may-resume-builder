@@ -5,17 +5,43 @@ import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon } from '../utils/i
 
 // ... existing prompts ...
 
-const TAILORING_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary 1-page resume and a job description. Your task is to tailor the resume bullets to align with the job requirements while maintaining truthfulness.
+const SUGGESTIONS_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary 1-page resume and a job description. Your task is to suggest specific changes to align the resume with the job requirements while maintaining truthfulness.
 
-TAILORING RULES:
+ANALYSIS RULES:
 1. Analyze the job description for key skills, requirements, and keywords
-2. Rewrite bullet points to emphasize relevant experience and skills
-3. Use language and terminology from the job description where appropriate
+2. Identify the TOP 10 most impactful changes to make the resume stand out for this role
+3. For each suggestion, explain WHY it matches the JD and assess the RISK of the change
 4. NEVER fabricate experience - only reframe and emphasize existing accomplishments
-5. Maintain the "did X by Y as shown by Z" framework
-6. Keep bullets to MAX 2 lines
-7. Use action verbs and metrics
-8. Prioritize the most relevant experiences for this specific role
+5. Maintain the "did X by Y as shown by Z" framework where possible
+6. Prioritize changes that have high impact and low risk
+
+Respond with a JSON object in this EXACT format:
+{
+  "action": "tailoring_suggestions",
+  "suggestions": [
+    {
+      "id": "1",
+      "type": "bullet_change",
+      "location": "Experience 1, Bullet 2",
+      "original": "Original bullet text",
+      "proposed": "Proposed new bullet text",
+      "impact": "high|medium|low",
+      "why": "Explanation of why this matches the job description (2-3 sentences)",
+      "risk": "low|medium|high",
+      "riskReason": "Brief explanation of any truthfulness concerns"
+    }
+  ]
+}
+
+Include exactly 10 suggestions, ordered by impact (highest first).`;
+
+const FINAL_TAILORING_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary resume and a set of ACCEPTED changes. Apply ONLY the accepted changes to create the final tailored resume.
+
+RULES:
+1. Apply each accepted change exactly as specified
+2. Keep all other content unchanged from the original resume
+3. Ensure proper formatting and consistency
+4. Maintain the resume structure
 
 Respond with a JSON object in this EXACT format:
 {
@@ -30,32 +56,32 @@ Respond with a JSON object in this EXACT format:
         "title": "Job Title",
         "location": "City, ST",
         "dates": "YYYY - YYYY",
-        "bullets": [
-          "Tailored bullet emphasizing relevant skills for this job",
-          "Another tailored achievement with metrics"
-        ]
+        "bullets": ["...", "..."]
       }
     ],
-    "skills": "Skills relevant to this job",
+    "skills": "...",
     "additional": "..."
   },
-  "explanation": "Brief explanation of key changes made to tailor this resume"
+  "explanation": "Brief summary of changes applied"
 }`;
 
 function Stage2Tailor({ primaryResume, onBack }) {
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [suggestions, setSuggestions] = useState(null)
+  const [acceptedSuggestions, setAcceptedSuggestions] = useState({})
   const [tailoredResume, setTailoredResume] = useState(null)
   const [explanation, setExplanation] = useState('')
   const [showComparison, setShowComparison] = useState(true)
 
-  const handleTailor = async (e) => {
+  const handleAnalyze = async (e) => {
     e.preventDefault()
     if (!jobDescription.trim()) return
 
     setIsLoading(true)
+    setSuggestions(null)
+    setAcceptedSuggestions({})
     setTailoredResume(null)
-    setExplanation('')
 
     try {
       const prompt = `Here is the primary 1-page resume data:
@@ -64,9 +90,47 @@ ${JSON.stringify(primaryResume, null, 2)}
 Here is the job description:
 ${jobDescription}
 
-Please tailor this resume for the job description.`
+Please analyze and provide your top 10 tailoring suggestions.`
 
-      const response = await callClaude(null, [{ role: 'user', content: prompt }], TAILORING_PROMPT)
+      const response = await callClaude(null, [{ role: 'user', content: prompt }], SUGGESTIONS_PROMPT)
+
+      // Parse the response
+      const jsonMatch = response.match(/\{[\s\S]*"action":\s*"tailoring_suggestions"[\s\S]*\}/)
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0])
+        setSuggestions(result.suggestions || [])
+        // Default all to accepted
+        const defaultAccepted = {}
+        result.suggestions.forEach(s => {
+          defaultAccepted[s.id] = true
+        })
+        setAcceptedSuggestions(defaultAccepted)
+      } else {
+        throw new Error('Could not parse suggestions response')
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGenerateFinal = async () => {
+    setIsLoading(true)
+    setTailoredResume(null)
+
+    try {
+      const accepted = suggestions.filter(s => acceptedSuggestions[s.id])
+      
+      const prompt = `Here is the original resume:
+${JSON.stringify(primaryResume, null, 2)}
+
+Here are the accepted changes to apply:
+${JSON.stringify(accepted, null, 2)}
+
+Please generate the final tailored resume with ONLY these accepted changes applied.`
+
+      const response = await callClaude(null, [{ role: 'user', content: prompt }], FINAL_TAILORING_PROMPT)
 
       // Parse the response
       const jsonMatch = response.match(/\{[\s\S]*"action":\s*"tailored_resume"[\s\S]*\}/)
@@ -81,6 +145,31 @@ Please tailor this resume for the job description.`
       alert(`Error: ${error.message}`)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const toggleSuggestion = (id) => {
+    setAcceptedSuggestions(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }))
+  }
+
+  const getImpactColor = (impact) => {
+    switch(impact) {
+      case 'high': return '#10b981'
+      case 'medium': return '#f59e0b'
+      case 'low': return '#6b7280'
+      default: return '#6b7280'
+    }
+  }
+
+  const getRiskColor = (risk) => {
+    switch(risk) {
+      case 'low': return '#10b981'
+      case 'medium': return '#f59e0b'
+      case 'high': return '#ef4444'
+      default: return '#6b7280'
     }
   }
 
@@ -135,7 +224,7 @@ Please tailor this resume for the job description.`
         </p>
       </div>
 
-      {!masterResume && (
+      {!primaryResume && (
         <div className="card-premium" style={{ borderLeft: '4px solid #ef4444' }}>
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No primary resume found. Please build one first to enable tailoring.
@@ -146,9 +235,9 @@ Please tailor this resume for the job description.`
         </div>
       )}
 
-      {masterResume && (
+      {primaryResume && (
         <>
-          {!tailoredResume && !isLoading && (
+          {!suggestions && !tailoredResume && !isLoading && (
             <div className="card-premium">
               <div className="card-title">
                 <TargetIcon />
@@ -158,7 +247,7 @@ Please tailor this resume for the job description.`
                 Paste the full job posting below. May will analyze key skills and reframe your accomplishments to stand out to recruiters.
               </p>
 
-              <form onSubmit={handleTailor}>
+              <form onSubmit={handleAnalyze}>
                 <div style={{ position: 'relative', marginBottom: 'var(--space-md)' }}>
                   <textarea
                     id="jobDescription"
@@ -201,22 +290,193 @@ Please tailor this resume for the job description.`
                   disabled={!jobDescription.trim()}
                   style={{ width: '100%' }}
                 >
-                  <WritingIcon />
-                  Tailor Resume Now
+                  <TargetIcon />
+                  Analyze Job & Get Suggestions
                 </button>
               </form>
             </div>
           )}
 
-          {isLoading && (
+          {isLoading && !suggestions && (
             <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
               <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
                 <TargetIcon />
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
-                Analyzing job description and tailoring your resume...
+                Analyzing job description and generating suggestions...
               </p>
               <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
+            </div>
+          )}
+
+          {isLoading && suggestions && (
+            <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
+              <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
+                <WritingIcon />
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
+                Generating tailored resume from accepted suggestions...
+              </p>
+              <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
+            </div>
+          )}
+
+          {suggestions && !tailoredResume && !isLoading && (
+            <div className="stagger-1">
+              <div className="card-premium" style={{ borderLeft: '4px solid #3b82f6', background: '#eff6ff' }}>
+                <div className="card-title" style={{ color: '#1e40af' }}>
+                  <TargetIcon />
+                  {suggestions.length} Tailoring Suggestions
+                </div>
+                <p style={{ color: '#1e40af', fontSize: '15px', lineHeight: '1.6', marginBottom: 'var(--space-md)' }}>
+                  Review each suggestion below. Toggle off any changes you don't want, then generate your tailored resume.
+                </p>
+                <div style={{ fontSize: '14px', color: '#1e40af', opacity: 0.8 }}>
+                  {Object.values(acceptedSuggestions).filter(Boolean).length} of {suggestions.length} suggestions accepted
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                {suggestions.map((suggestion, idx) => (
+                  <div 
+                    key={suggestion.id}
+                    className="card-premium"
+                    style={{ 
+                      opacity: acceptedSuggestions[suggestion.id] ? 1 : 0.6,
+                      borderLeft: `4px solid ${acceptedSuggestions[suggestion.id] ? '#10b981' : '#e5e7eb'}`,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-md)' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
+                          <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)' }}>
+                            Suggestion {idx + 1}
+                          </span>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            fontWeight: '600',
+                            padding: '2px 8px', 
+                            borderRadius: '8px',
+                            background: `${getImpactColor(suggestion.impact)}20`,
+                            color: getImpactColor(suggestion.impact),
+                            textTransform: 'uppercase'
+                          }}>
+                            {suggestion.impact} impact
+                          </span>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            fontWeight: '600',
+                            padding: '2px 8px', 
+                            borderRadius: '8px',
+                            background: `${getRiskColor(suggestion.risk)}20`,
+                            color: getRiskColor(suggestion.risk),
+                            textTransform: 'uppercase'
+                          }}>
+                            {suggestion.risk} risk
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
+                          {suggestion.location}
+                        </div>
+                      </div>
+                      
+                      <label style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px',
+                        cursor: 'pointer',
+                        padding: '8px 16px',
+                        borderRadius: '12px',
+                        background: acceptedSuggestions[suggestion.id] ? '#10b98120' : '#f3f4f6',
+                        border: `2px solid ${acceptedSuggestions[suggestion.id] ? '#10b981' : '#e5e7eb'}`,
+                        transition: 'all 0.2s ease'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={acceptedSuggestions[suggestion.id]}
+                          onChange={() => toggleSuggestion(suggestion.id)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: '600',
+                          color: acceptedSuggestions[suggestion.id] ? '#10b981' : '#6b7280'
+                        }}>
+                          {acceptedSuggestions[suggestion.id] ? 'Accept' : 'Reject'}
+                        </span>
+                      </label>
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--space-md)' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Original:</div>
+                      <div style={{ 
+                        padding: 'var(--space-sm)', 
+                        background: '#fef2f2', 
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        borderLeft: '3px solid #ef4444'
+                      }}>
+                        {suggestion.original}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--space-md)' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Proposed:</div>
+                      <div style={{ 
+                        padding: 'var(--space-sm)', 
+                        background: '#f0fdf4', 
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        lineHeight: '1.5',
+                        borderLeft: '3px solid #10b981'
+                      }}>
+                        {suggestion.proposed}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 'var(--space-sm)' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Why this matches:</div>
+                      <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                        {suggestion.why}
+                      </div>
+                    </div>
+
+                    {suggestion.risk !== 'low' && (
+                      <div style={{ 
+                        padding: 'var(--space-sm)', 
+                        background: '#fef3c7', 
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        color: '#92400e',
+                        borderLeft: '3px solid #f59e0b'
+                      }}>
+                        <strong>Risk note:</strong> {suggestion.riskReason}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
+                <button 
+                  onClick={handleGenerateFinal} 
+                  className="btn btn-primary"
+                  disabled={Object.values(acceptedSuggestions).filter(Boolean).length === 0}
+                  style={{ flex: 2 }}
+                >
+                  <WritingIcon />
+                  Generate Tailored Resume ({Object.values(acceptedSuggestions).filter(Boolean).length} changes)
+                </button>
+                <button 
+                  onClick={() => { setSuggestions(null); setJobDescription(''); }} 
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  Start Over
+                </button>
+              </div>
             </div>
           )}
 
@@ -289,7 +549,13 @@ Please tailor this resume for the job description.`
                   Download Tailored DOCX
                 </button>
                 <button 
-                  onClick={() => { setTailoredResume(null); setJobDescription(''); }} 
+                  onClick={() => setTailoredResume(null)} 
+                  className="btn btn-secondary"
+                >
+                  ← Back to Suggestions
+                </button>
+                <button 
+                  onClick={() => { setTailoredResume(null); setSuggestions(null); setJobDescription(''); }} 
                   className="btn btn-secondary"
                 >
                   Tailor for Another Job
