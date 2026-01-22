@@ -154,13 +154,17 @@ function BatchTailor({ masterResume, onBack }) {
 
   return (
     <div className="container" style={{ maxWidth: '900px' }}>
-      <div className="page-header">
+      <nav className="nav-bar">
         {onBack && (
           <button className="back-button" onClick={onBack}>
             <ArrowLeftIcon />
-            Back to Home
+            Back
           </button>
         )}
+        <div className="logo" style={{ fontSize: '24px', margin: 0 }}>May</div>
+      </nav>
+
+      <div className="page-header">
         <h1 className="page-title">Batch Tailor Resumes</h1>
         <p className="page-subtitle">Create multiple tailored resumes for different jobs in one go</p>
       </div>

@@ -188,13 +188,17 @@ function ResumeUpload({ onResumeComplete, onBack }) {
 
   return (
     <div className="container">
-      <div className="page-header">
+      <nav className="nav-bar">
         {onBack && (
           <button className="back-button" onClick={onBack}>
             <ArrowLeftIcon />
-            Back to Home
+            Back
           </button>
         )}
+        <div className="logo" style={{ fontSize: '24px', margin: 0 }}>May</div>
+      </nav>
+
+      <div className="page-header">
         <h1 className="page-title">Update Your Resume</h1>
         <p className="page-subtitle">
           Upload your existing resume and May will rewrite it using professional best practices

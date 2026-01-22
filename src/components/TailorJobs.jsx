@@ -52,13 +52,17 @@ function TailorJobs({ masterResume, onBack }) {
 
   return (
     <div className="container">
-      <div className="page-header">
+      <nav className="nav-bar">
         {onBack && (
           <button className="back-button" onClick={onBack}>
             <ArrowLeftIcon />
             Back to Home
           </button>
         )}
+        <div className="logo" style={{ fontSize: '24px', margin: 0 }}>May</div>
+      </nav>
+
+      <div className="page-header">
         <h1 className="page-title">Tailor for Jobs</h1>
         <p className="page-subtitle">How many roles are you applying for?</p>
       </div>

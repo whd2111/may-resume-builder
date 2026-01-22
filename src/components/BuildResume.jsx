@@ -27,11 +27,15 @@ function BuildResume({ onResumeComplete, onBack, existingResume }) {
 
   return (
     <div className="container">
-      <div className="page-header">
+      <nav className="nav-bar">
         <button className="back-button" onClick={onBack}>
           <ArrowLeftIcon />
           Back to Home
         </button>
+        <div className="logo" style={{ fontSize: '24px', margin: 0 }}>May</div>
+      </nav>
+
+      <div className="page-header">
         <h1 className="page-title">Build Your Resume</h1>
         <p className="page-subtitle">How would you like to create your professional resume?</p>
       </div>

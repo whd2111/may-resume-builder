@@ -303,16 +303,36 @@ body::after {
   transform: translateY(-2px);
 }
 
+/* --- Navigation --- */
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(253, 251, 247, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: var(--space-md) var(--space-xl);
+  margin: calc(var(--space-3xl) * -1) calc(var(--space-3xl) * -1) var(--space-xl);
+  border-bottom: 1px solid var(--border-subtle);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .back-button {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: transparent;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
-  padding: 10px 20px;
-  margin-bottom: var(--space-xl);
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -322,6 +342,11 @@ body::after {
   border-color: var(--accent-primary);
   transform: translateX(-4px);
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.1);
+}
+
+.back-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .button-group {

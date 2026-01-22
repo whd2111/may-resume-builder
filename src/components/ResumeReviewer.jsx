@@ -149,13 +149,17 @@ function ResumeReviewer({ masterResume, onBack }) {
 
   return (
     <div className="container" style={{ maxWidth: '900px' }}>
-      <div className="page-header">
+      <nav className="nav-bar">
         {onBack && (
           <button className="back-button" onClick={onBack}>
             <ArrowLeftIcon />
             Back to Home
           </button>
         )}
+        <div className="logo" style={{ fontSize: '24px', margin: 0 }}>May</div>
+      </nav>
+
+      <div className="page-header">
         <h1 className="page-title">Resume Review</h1>
         <p className="page-subtitle">Get expert AI feedback on your resume quality</p>
       </div>
