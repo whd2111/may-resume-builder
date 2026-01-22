@@ -6,8 +6,7 @@ import {
   AlignmentType,
   LevelFormat,
   BorderStyle,
-  TabStopType,
-  TabStopPosition
+  TabStopType
 } from 'docx'
 import { saveAs } from 'file-saver'
 
@@ -28,6 +27,116 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
     }
   }
   // Create the document with US Letter page size
+  const rightTabPosition = 10800
+  const lineLimiter = createLineLimiter(50)
+  const docChildren = []
+
+  const pushParagraph = (paragraph, lineCost, { force = false } = {}) => {
+    if (force || lineLimiter.canFit(lineCost)) {
+      docChildren.push(paragraph)
+      lineLimiter.consume(lineCost)
+    }
+  }
+
+  // Header: Name
+  pushParagraph(
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({
+          text: resumeData.name.toUpperCase(),
+          bold: true,
+          size: 24 // 12pt for name
+        })
+      ],
+      spacing: { after: 60 }
+    }),
+    1,
+    { force: true }
+  )
+
+  // Contact info
+  pushParagraph(
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({
+          text: `${resumeData.contact.phone} | ${resumeData.contact.email}`,
+          size: 20 // 10pt
+        })
+      ],
+      spacing: { after: 180 }
+    }),
+    1,
+    { force: true }
+  )
+
+  // Education Section Header
+  pushParagraph(
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'EDUCATION',
+          bold: true,
+          size: 20
+        })
+      ],
+      spacing: { after: 80 },
+      border: {
+        bottom: {
+          color: '000000',
+          space: 1,
+          style: BorderStyle.SINGLE,
+          size: 6
+        }
+      }
+    }),
+    1,
+    { force: true }
+  )
+
+  // Education entries
+  docChildren.push(
+    ...generateEducationSection(resumeData.education, rightTabPosition, lineLimiter)
+  )
+
+  // Experience Section Header
+  if (lineLimiter.canFit(1)) {
+    pushParagraph(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'EXPERIENCE',
+            bold: true,
+            size: 20
+          })
+        ],
+        spacing: { before: 180, after: 100 },
+        border: {
+          bottom: {
+            color: '000000',
+            space: 1,
+            style: BorderStyle.SINGLE,
+            size: 6
+          }
+        }
+      }),
+      1
+    )
+  }
+
+  // Experience entries
+  docChildren.push(
+    ...generateExperienceSection(resumeData.experience, rightTabPosition, lineLimiter)
+  )
+
+  // Skills/Additional Info Section
+  docChildren.push(
+    ...(resumeData.skills
+      ? generateSkillsSection(resumeData.skills, lineLimiter)
+      : [])
+  )
+
   const doc = new Document({
     styles: {
       default: {
@@ -75,81 +184,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
             }
           }
         },
-        children: [
-          // Header: Name
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [
-              new TextRun({
-                text: resumeData.name.toUpperCase(),
-                bold: true,
-                size: 24 // 12pt for name
-              })
-            ],
-            spacing: { after: 60 }
-          }),
-
-          // Contact info
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [
-              new TextRun({
-                text: `${resumeData.contact.phone} | ${resumeData.contact.email}`,
-                size: 20 // 10pt
-              })
-            ],
-            spacing: { after: 180 }
-          }),
-
-          // Education Section Header
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'EDUCATION',
-                bold: true,
-                size: 20
-              })
-            ],
-            spacing: { after: 80 },
-            border: {
-              bottom: {
-                color: '000000',
-                space: 1,
-                style: BorderStyle.SINGLE,
-                size: 6
-              }
-            }
-          }),
-
-          // Education entries
-          ...generateEducationSection(resumeData.education),
-
-          // Experience Section Header
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: 'EXPERIENCE',
-                bold: true,
-                size: 20
-              })
-            ],
-            spacing: { before: 180, after: 100 },
-            border: {
-              bottom: {
-                color: '000000',
-                space: 1,
-                style: BorderStyle.SINGLE,
-                size: 6
-              }
-            }
-          }),
-
-          // Experience entries
-          ...generateExperienceSection(resumeData.experience),
-
-          // Skills/Additional Info Section
-          ...(resumeData.skills ? generateSkillsSection(resumeData.skills) : [])
-        ]
+        children: docChildren
       }
     ]
   })
@@ -159,12 +194,13 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   saveAs(blob, filename)
 }
 
-function generateEducationSection(education) {
+function generateEducationSection(education, rightTabPosition, lineLimiter) {
   if (!education || education.length === 0) return []
 
   const elements = []
 
-  education.forEach((edu) => {
+  for (const edu of education) {
+    if (!lineLimiter.canFit(2)) break
     // Institution name (left) and location (right) on same line
     elements.push(
       new Paragraph({
@@ -186,14 +222,16 @@ function generateEducationSection(education) {
         tabStops: [
           {
             type: TabStopType.RIGHT,
-            position: TabStopPosition.MAX
+            position: rightTabPosition
           }
         ],
         spacing: { before: 120, after: 60 }
       })
     )
+    lineLimiter.consume(1)
 
     // Degree (left) and dates (right) on same line
+    if (!lineLimiter.canFit(1)) break
     elements.push(
       new Paragraph({
         children: [
@@ -213,15 +251,17 @@ function generateEducationSection(education) {
         tabStops: [
           {
             type: TabStopType.RIGHT,
-            position: TabStopPosition.MAX
+            position: rightTabPosition
           }
         ],
         spacing: { after: edu.details ? 60 : 120 }
       })
     )
+    lineLimiter.consume(1)
 
     // Details if present
     if (edu.details) {
+      if (!lineLimiter.canFit(estimateLines(edu.details, 80))) break
       elements.push(
         new Paragraph({
           children: [
@@ -234,18 +274,20 @@ function generateEducationSection(education) {
           spacing: { after: 160 }
         })
       )
+      lineLimiter.consume(estimateLines(edu.details, 80))
     }
-  })
+  }
 
   return elements
 }
 
-function generateExperienceSection(experience) {
+function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
   if (!experience || experience.length === 0) return []
 
   const elements = []
 
-  experience.forEach((exp) => {
+  for (const exp of experience) {
+    if (!lineLimiter.canFit(2)) break
     // Company name (left) and location (right) on same line
     elements.push(
       new Paragraph({
@@ -267,14 +309,16 @@ function generateExperienceSection(experience) {
         tabStops: [
           {
             type: TabStopType.RIGHT,
-            position: TabStopPosition.MAX
+            position: rightTabPosition
           }
         ],
         spacing: { before: 120, after: 60 }
       })
     )
+    lineLimiter.consume(1)
 
     // Title (left) and dates (right) on same line
+    if (!lineLimiter.canFit(1)) break
     elements.push(
       new Paragraph({
         children: [
@@ -295,16 +339,19 @@ function generateExperienceSection(experience) {
         tabStops: [
           {
             type: TabStopType.RIGHT,
-            position: TabStopPosition.MAX
+            position: rightTabPosition
           }
         ],
         spacing: { after: 120 }
       })
     )
+    lineLimiter.consume(1)
 
     // Bullets
     if (exp.bullets && exp.bullets.length > 0) {
-      exp.bullets.forEach((bullet) => {
+      for (const bullet of exp.bullets) {
+        const bulletLines = estimateLines(bullet, 70)
+        if (!lineLimiter.canFit(bulletLines)) break
         elements.push(
           new Paragraph({
             numbering: {
@@ -320,14 +367,23 @@ function generateExperienceSection(experience) {
             spacing: { after: 80 }
           })
         )
-      })
+        lineLimiter.consume(bulletLines)
+      }
     }
-  })
+  }
 
   return elements
 }
 
-function generateSkillsSection(skills) {
+function generateSkillsSection(skills, lineLimiter) {
+  if (!lineLimiter.canFit(2)) return []
+
+  const linesForSkills = estimateLines(skills, 80)
+  if (!lineLimiter.canFit(1 + linesForSkills)) return []
+
+  lineLimiter.consume(1)
+  lineLimiter.consume(linesForSkills)
+
   return [
     new Paragraph({
       children: [
@@ -362,4 +418,23 @@ function generateSkillsSection(skills) {
       spacing: { after: 120 }
     })
   ]
+}
+
+function createLineLimiter(maxLines) {
+  let usedLines = 0
+
+  return {
+    canFit(lines) {
+      return usedLines + lines <= maxLines
+    },
+    consume(lines) {
+      usedLines += lines
+    }
+  }
+}
+
+function estimateLines(text, maxCharsPerLine) {
+  if (!text) return 1
+  const normalized = String(text).replace(/\s+/g, ' ').trim()
+  return Math.max(1, Math.ceil(normalized.length / maxCharsPerLine))
 }
