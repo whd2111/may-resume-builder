@@ -2,205 +2,142 @@ import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon } from '../utils/icons'
-
-// ... existing prompts ...
-
-const SUGGESTIONS_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary 1-page resume and a job description. Your task is to suggest specific changes to align the resume with the job requirements while maintaining truthfulness.
-
-ANALYSIS RULES:
-1. Analyze the job description for key skills, requirements, and keywords
-2. Identify the TOP 10 most impactful changes to make the resume stand out for this role
-3. For each suggestion, explain WHY it matches the JD and assess the RISK of the change
-4. NEVER fabricate experience - only reframe and emphasize existing accomplishments
-5. Maintain the "did X by Y as shown by Z" framework where possible
-6. Prioritize changes that have high impact and low risk
-
-Respond with a JSON object in this EXACT format:
-{
-  "action": "tailoring_suggestions",
-  "suggestions": [
-    {
-      "id": "1",
-      "type": "bullet_change",
-      "location": "Experience 1, Bullet 2",
-      "original": "Original bullet text",
-      "proposed": "Proposed new bullet text",
-      "impact": "high|medium|low",
-      "why": "Explanation of why this matches the job description (2-3 sentences)",
-      "risk": "low|medium|high",
-      "riskReason": "Brief explanation of any truthfulness concerns"
-    }
-  ]
-}
-
-Include exactly 10 suggestions, ordered by impact (highest first).`;
-
-const FINAL_TAILORING_PROMPT = `You are May, an expert resume tailoring assistant. You have the user's primary resume and a set of ACCEPTED changes. Apply ONLY the accepted changes to create the final tailored resume.
-
-RULES:
-1. Apply each accepted change exactly as specified
-2. Keep all other content unchanged from the original resume
-3. Ensure proper formatting and consistency
-4. Maintain the resume structure
-
-Respond with a JSON object in this EXACT format:
-{
-  "action": "tailored_resume",
-  "data": {
-    "name": "Full Name",
-    "contact": {...},
-    "education": [...],
-    "experience": [
-      {
-        "company": "Company Name",
-        "title": "Job Title",
-        "location": "City, ST",
-        "dates": "YYYY - YYYY",
-        "bullets": ["...", "..."]
-      }
-    ],
-    "skills": "...",
-    "additional": "..."
-  },
-  "explanation": "Brief summary of changes applied"
-}`;
+import { extractJobChecklist } from '../utils/checklistExtractor'
+import { scoreAndSelectBullets } from '../utils/bulletScorer'
+import { CHECKLIST_TAILORING_PROMPT } from '../utils/tailoringPrompts'
 
 function Stage2Tailor({ primaryResume, onBack }) {
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState(null)
-  const [acceptedSuggestions, setAcceptedSuggestions] = useState({})
+  const [loadingStage, setLoadingStage] = useState('') // 'checklist', 'scoring', 'tailoring'
+  
+  // New checklist-based flow
+  const [checklist, setChecklist] = useState(null)
+  const [selection, setSelection] = useState(null)
   const [tailoredResume, setTailoredResume] = useState(null)
-  const [explanation, setExplanation] = useState('')
+  
+  // UI state
+  const [showChecklist, setShowChecklist] = useState(false)
+  const [showSelection, setShowSelection] = useState(false)
   const [showComparison, setShowComparison] = useState(true)
 
-  const handleAnalyze = async (e) => {
+  // New checklist-based pipeline
+  const handleAnalyzeWithChecklist = async (e) => {
     e.preventDefault()
     if (!jobDescription.trim()) return
 
     setIsLoading(true)
-    setSuggestions(null)
-    setAcceptedSuggestions({})
+    setChecklist(null)
+    setSelection(null)
     setTailoredResume(null)
 
     try {
-      const prompt = `Here is the primary 1-page resume data:
-${JSON.stringify(primaryResume, null, 2)}
+      // Step 1: Extract job checklist
+      setLoadingStage('checklist')
+      const extractedChecklist = await extractJobChecklist(jobDescription)
+      setChecklist(extractedChecklist)
 
-Here is the job description:
-${jobDescription}
+      // Step 2: Score and select bullets
+      setLoadingStage('scoring')
+      const selectionResult = scoreAndSelectBullets(primaryResume, extractedChecklist)
+      setSelection(selectionResult)
 
-Please analyze and provide your top 10 tailoring suggestions.`
+      // Step 3: Tailor the selected bullets
+      setLoadingStage('tailoring')
+      await handleTailorSelectedBullets(extractedChecklist, selectionResult)
 
-      const response = await callClaude(null, [{ role: 'user', content: prompt }], SUGGESTIONS_PROMPT)
-
-      // Parse the response
-      const jsonMatch = response.match(/\{[\s\S]*"action":\s*"tailoring_suggestions"[\s\S]*\}/)
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0])
-        setSuggestions(result.suggestions || [])
-        // Default all to accepted
-        const defaultAccepted = {}
-        result.suggestions.forEach(s => {
-          defaultAccepted[s.id] = true
-        })
-        setAcceptedSuggestions(defaultAccepted)
-      } else {
-        throw new Error('Could not parse suggestions response')
-      }
     } catch (error) {
+      console.error('Pipeline error:', error)
       alert(`Error: ${error.message}`)
     } finally {
       setIsLoading(false)
+      setLoadingStage('')
     }
   }
 
-  const handleGenerateFinal = async () => {
-    setIsLoading(true)
-    setTailoredResume(null)
-
+  const handleTailorSelectedBullets = async (checklistData, selectionData) => {
     try {
-      const accepted = suggestions.filter(s => acceptedSuggestions[s.id])
+      // Prepare the prompt with checklist and selected bullets
+      const prompt = `Job Checklist:
+${JSON.stringify(checklistData, null, 2)}
+
+Selected Bullets to Rewrite (in priority order):
+${JSON.stringify(selectionData.selected_bullets, null, 2)}
+
+Coverage Report:
+- Covered must-haves: ${selectionData.coverage_report.covered_must_haves.join(', ')}
+- Missing must-haves: ${selectionData.coverage_report.missing_must_haves.join(', ')}
+
+Rewrite these bullets to emphasize the must-haves and primary keywords. Return JSON only.`
+
+      const response = await callClaude(
+        null, 
+        [{ role: 'user', content: prompt }], 
+        CHECKLIST_TAILORING_PROMPT
+      )
+
+      // Parse response - clean markdown if present
+      let cleanedResponse = response.trim()
+      cleanedResponse = cleanedResponse.replace(/^```json?\s*/i, '')
+      cleanedResponse = cleanedResponse.replace(/\s*```$/, '')
+      cleanedResponse = cleanedResponse.trim()
+
+      const result = JSON.parse(cleanedResponse)
       
-      const prompt = `Here is the original resume:
-${JSON.stringify(primaryResume, null, 2)}
+      // Apply the rewritten bullets to create tailored resume
+      const tailored = applyRewrittenBullets(primaryResume, result.rewritten_bullets)
+      setTailoredResume(tailored)
 
-Here are the accepted changes to apply:
-${JSON.stringify(accepted, null, 2)}
-
-Please generate the final tailored resume with ONLY these accepted changes applied.`
-
-      const response = await callClaude(null, [{ role: 'user', content: prompt }], FINAL_TAILORING_PROMPT)
-
-      // Parse the response
-      const jsonMatch = response.match(/\{[\s\S]*"action":\s*"tailored_resume"[\s\S]*\}/)
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0])
-        setTailoredResume(result.data)
-        setExplanation(result.explanation || 'Resume tailored successfully!')
-      } else {
-        throw new Error('Could not parse tailoring response')
-      }
     } catch (error) {
-      alert(`Error: ${error.message}`)
-    } finally {
-      setIsLoading(false)
+      console.error('Tailoring error:', error)
+      throw new Error(`Failed to tailor bullets: ${error.message}`)
     }
   }
 
-  const toggleSuggestion = (id) => {
-    setAcceptedSuggestions(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }))
+  const applyRewrittenBullets = (resume, rewrittenBullets) => {
+    // Deep clone the resume
+    const tailored = JSON.parse(JSON.stringify(resume))
+
+    // Apply each rewritten bullet
+    rewrittenBullets.forEach(({ bullet_id, new_text }) => {
+      // Parse bullet_id like "exp0_bullet2"
+      const match = bullet_id.match(/exp(\d+)_bullet(\d+)/)
+      if (match) {
+        const expIndex = parseInt(match[1], 10)
+        const bulletIndex = parseInt(match[2], 10)
+
+        if (tailored.experience[expIndex] && tailored.experience[expIndex].bullets[bulletIndex]) {
+          tailored.experience[expIndex].bullets[bulletIndex] = new_text
+        }
+      }
+    })
+
+    return tailored
   }
 
-  const getImpactColor = (impact) => {
-    switch(impact) {
-      case 'high': return '#10b981'
-      case 'medium': return '#f59e0b'
-      case 'low': return '#6b7280'
-      default: return '#6b7280'
-    }
+  const handleRetailor = () => {
+    setChecklist(null)
+    setSelection(null)
+    setTailoredResume(null)
   }
 
-  const getRiskColor = (risk) => {
-    switch(risk) {
-      case 'low': return '#10b981'
-      case 'medium': return '#f59e0b'
-      case 'high': return '#ef4444'
-      default: return '#6b7280'
-    }
+  const handleStartOver = () => {
+    setJobDescription('')
+    setChecklist(null)
+    setSelection(null)
+    setTailoredResume(null)
   }
 
   const handleDownload = async () => {
     try {
-      // Extract company name from job description (look for common patterns)
-      const companyMatch = jobDescription.match(/(?:at|for|with|@)\s+([A-Z][A-Za-z\s&]+?)(?:\s+is|\s+seeks|\s+looking|\.|,|$)/i)
-      const companyName = companyMatch ? companyMatch[1].trim() : 'TAILORED'
+      // Use company name from checklist if available
+      const companyName = checklist?.job_metadata?.company_name || 'TAILORED'
       
       await generateDOCX(tailoredResume, null, companyName)
       alert('Resume downloaded successfully!')
     } catch (error) {
       alert(`Error generating document: ${error.message}`)
     }
-  }
-
-  // Helper to check if bullet changed
-  const getBulletComparison = (expIndex, bulletIndex) => {
-    if (!primaryResume.experience[expIndex]) return { changed: false, original: null }
-
-    const originalBullets = primaryResume.experience[expIndex].bullets || []
-    const tailoredBullets = tailoredResume.experience[expIndex].bullets || []
-
-    const original = originalBullets[bulletIndex]
-    const tailored = tailoredBullets[bulletIndex]
-
-    if (!original || !tailored) return { changed: true, original }
-
-    // Simple comparison - could be made more sophisticated
-    const changed = original.trim() !== tailored.trim()
-    return { changed, original }
   }
 
   return (
@@ -237,17 +174,17 @@ Please generate the final tailored resume with ONLY these accepted changes appli
 
       {primaryResume && (
         <>
-          {!suggestions && !tailoredResume && !isLoading && (
+          {!checklist && !tailoredResume && !isLoading && (
             <div className="card-premium">
               <div className="card-title">
                 <TargetIcon />
                 Job Description
               </div>
               <p style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-secondary)', fontSize: '15px' }}>
-                Paste the full job posting below. May will analyze key skills and reframe your accomplishments to stand out to recruiters.
+                Paste the full job posting below. May will extract requirements, score your bullets, and tailor your resume automatically.
               </p>
 
-              <form onSubmit={handleAnalyze}>
+              <form onSubmit={handleAnalyzeWithChecklist}>
                 <div style={{ position: 'relative', marginBottom: 'var(--space-md)' }}>
                   <textarea
                     id="jobDescription"
@@ -291,188 +228,123 @@ Please generate the final tailored resume with ONLY these accepted changes appli
                   style={{ width: '100%' }}
                 >
                   <TargetIcon />
-                  Analyze Job & Get Suggestions
+                  Analyze & Tailor Resume
                 </button>
               </form>
             </div>
           )}
 
-          {isLoading && !suggestions && (
+          {isLoading && (
             <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
               <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
-                <TargetIcon />
+                {loadingStage === 'checklist' && <TargetIcon />}
+                {loadingStage === 'scoring' && <TargetIcon />}
+                {loadingStage === 'tailoring' && <WritingIcon />}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
-                Analyzing job description and generating suggestions...
+                {loadingStage === 'checklist' && 'Extracting job requirements...'}
+                {loadingStage === 'scoring' && 'Scoring and selecting bullets...'}
+                {loadingStage === 'tailoring' && 'Tailoring selected bullets...'}
               </p>
               <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
             </div>
           )}
 
-          {isLoading && suggestions && (
-            <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
-              <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
-                <WritingIcon />
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
-                Generating tailored resume from accepted suggestions...
-              </p>
-              <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
-            </div>
-          )}
-
-          {suggestions && !tailoredResume && !isLoading && (
+          {/* Show checklist and selection data (before final resume) */}
+          {checklist && selection && !tailoredResume && !isLoading && (
             <div className="stagger-1">
+              {/* Checklist Summary */}
               <div className="card-premium" style={{ borderLeft: '4px solid #3b82f6', background: '#eff6ff' }}>
                 <div className="card-title" style={{ color: '#1e40af' }}>
                   <TargetIcon />
-                  {suggestions.length} Tailoring Suggestions
+                  Job Analysis Complete
                 </div>
-                <p style={{ color: '#1e40af', fontSize: '15px', lineHeight: '1.6', marginBottom: 'var(--space-md)' }}>
-                  Review each suggestion below. Toggle off any changes you don't want, then generate your tailored resume.
+                <p style={{ color: '#1e40af', fontSize: '15px', lineHeight: '1.6' }}>
+                  Extracted requirements from {checklist.job_metadata.company_name} - {checklist.job_metadata.job_title}
                 </p>
-                <div style={{ fontSize: '14px', color: '#1e40af', opacity: 0.8 }}>
-                  {Object.values(acceptedSuggestions).filter(Boolean).length} of {suggestions.length} suggestions accepted
-                </div>
+                <button
+                  onClick={() => setShowChecklist(!showChecklist)}
+                  className="btn-secondary"
+                  style={{ marginTop: 'var(--space-md)', fontSize: '13px', padding: '6px 12px' }}
+                >
+                  {showChecklist ? 'Hide' : 'Show'} Checklist Details
+                </button>
+                
+                {showChecklist && (
+                  <div style={{ marginTop: 'var(--space-md)', fontSize: '14px', lineHeight: '1.6' }}>
+                    <div style={{ marginBottom: 'var(--space-sm)' }}>
+                      <strong>Must-Have Skills:</strong> {checklist.must_haves.hard_skills.join(', ')}
+                    </div>
+                    <div style={{ marginBottom: 'var(--space-sm)' }}>
+                      <strong>Must-Have Tools:</strong> {checklist.must_haves.tools.join(', ')}
+                    </div>
+                    <div>
+                      <strong>Primary Keywords:</strong> {checklist.keyword_pack.primary.join(', ')}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                {suggestions.map((suggestion, idx) => (
-                  <div 
-                    key={suggestion.id}
-                    className="card-premium"
-                    style={{ 
-                      opacity: acceptedSuggestions[suggestion.id] ? 1 : 0.6,
-                      borderLeft: `4px solid ${acceptedSuggestions[suggestion.id] ? '#10b981' : '#e5e7eb'}`,
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-md)' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
-                          <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)' }}>
-                            Suggestion {idx + 1}
-                          </span>
-                          <span style={{ 
-                            fontSize: '11px', 
-                            fontWeight: '600',
-                            padding: '2px 8px', 
-                            borderRadius: '8px',
-                            background: `${getImpactColor(suggestion.impact)}20`,
-                            color: getImpactColor(suggestion.impact),
-                            textTransform: 'uppercase'
-                          }}>
-                            {suggestion.impact} impact
-                          </span>
-                          <span style={{ 
-                            fontSize: '11px', 
-                            fontWeight: '600',
-                            padding: '2px 8px', 
-                            borderRadius: '8px',
-                            background: `${getRiskColor(suggestion.risk)}20`,
-                            color: getRiskColor(suggestion.risk),
-                            textTransform: 'uppercase'
-                          }}>
-                            {suggestion.risk} risk
-                          </span>
+              {/* Bullet Selection Summary */}
+              <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
+                <div className="card-title" style={{ color: '#065f46' }}>
+                  <WritingIcon />
+                  {selection.selected_bullets.length} Bullets Selected for Tailoring
+                </div>
+                <p style={{ color: '#065f46', fontSize: '15px', lineHeight: '1.6', marginBottom: 'var(--space-md)' }}>
+                  Coverage: {selection.coverage_report.covered_must_haves.length} of {selection.coverage_report.covered_must_haves.length + selection.coverage_report.missing_must_haves.length} must-haves covered
+                </p>
+
+                {selection.coverage_report.missing_must_haves.length > 0 && (
+                  <div style={{ 
+                    padding: 'var(--space-sm)', 
+                    background: '#fef3c7', 
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#92400e',
+                    marginBottom: 'var(--space-md)'
+                  }}>
+                    <strong>Missing from resume:</strong> {selection.coverage_report.missing_must_haves.join(', ')}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowSelection(!showSelection)}
+                  className="btn-secondary"
+                  style={{ fontSize: '13px', padding: '6px 12px' }}
+                >
+                  {showSelection ? 'Hide' : 'Show'} Selected Bullets
+                </button>
+
+                {showSelection && (
+                  <div style={{ marginTop: 'var(--space-md)' }}>
+                    {selection.selected_bullets.slice(0, 5).map((bullet, idx) => (
+                      <div key={bullet.bullet_id} style={{ 
+                        marginBottom: 'var(--space-sm)', 
+                        padding: 'var(--space-sm)',
+                        background: 'white',
+                        borderRadius: '8px',
+                        fontSize: '13px'
+                      }}>
+                        <div style={{ fontWeight: '600', color: '#065f46', marginBottom: '4px' }}>
+                          Score: {bullet.score} - {bullet.matched_terms.slice(0, 3).join(', ')}
                         </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 'var(--space-xs)' }}>
-                          {suggestion.location}
-                        </div>
+                        <div style={{ color: '#6b7280' }}>{bullet.original_text}</div>
                       </div>
-                      
-                      <label style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px',
-                        cursor: 'pointer',
-                        padding: '8px 16px',
-                        borderRadius: '12px',
-                        background: acceptedSuggestions[suggestion.id] ? '#10b98120' : '#f3f4f6',
-                        border: `2px solid ${acceptedSuggestions[suggestion.id] ? '#10b981' : '#e5e7eb'}`,
-                        transition: 'all 0.2s ease'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={acceptedSuggestions[suggestion.id]}
-                          onChange={() => toggleSuggestion(suggestion.id)}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                        />
-                        <span style={{ 
-                          fontSize: '14px', 
-                          fontWeight: '600',
-                          color: acceptedSuggestions[suggestion.id] ? '#10b981' : '#6b7280'
-                        }}>
-                          {acceptedSuggestions[suggestion.id] ? 'Accept' : 'Reject'}
-                        </span>
-                      </label>
-                    </div>
-
-                    <div style={{ marginBottom: 'var(--space-md)' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Original:</div>
-                      <div style={{ 
-                        padding: 'var(--space-sm)', 
-                        background: '#fef2f2', 
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        lineHeight: '1.5',
-                        borderLeft: '3px solid #ef4444'
-                      }}>
-                        {suggestion.original}
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 'var(--space-md)' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Proposed:</div>
-                      <div style={{ 
-                        padding: 'var(--space-sm)', 
-                        background: '#f0fdf4', 
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        lineHeight: '1.5',
-                        borderLeft: '3px solid #10b981'
-                      }}>
-                        {suggestion.proposed}
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: 'var(--space-sm)' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Why this matches:</div>
-                      <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                        {suggestion.why}
-                      </div>
-                    </div>
-
-                    {suggestion.risk !== 'low' && (
-                      <div style={{ 
-                        padding: 'var(--space-sm)', 
-                        background: '#fef3c7', 
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        color: '#92400e',
-                        borderLeft: '3px solid #f59e0b'
-                      }}>
-                        <strong>Risk note:</strong> {suggestion.riskReason}
+                    ))}
+                    {selection.selected_bullets.length > 5 && (
+                      <div style={{ fontSize: '13px', color: '#6b7280', fontStyle: 'italic' }}>
+                        ... and {selection.selected_bullets.length - 5} more bullets
                       </div>
                     )}
                   </div>
-                ))}
+                )}
               </div>
 
               <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
                 <button 
-                  onClick={handleGenerateFinal} 
-                  className="btn btn-primary"
-                  disabled={Object.values(acceptedSuggestions).filter(Boolean).length === 0}
-                  style={{ flex: 2 }}
-                >
-                  <WritingIcon />
-                  Generate Tailored Resume ({Object.values(acceptedSuggestions).filter(Boolean).length} changes)
-                </button>
-                <button 
-                  onClick={() => { setSuggestions(null); setJobDescription(''); }} 
+                  onClick={handleStartOver}
                   className="btn btn-secondary"
-                  style={{ flex: 1 }}
                 >
                   Start Over
                 </button>
@@ -487,7 +359,9 @@ Please generate the final tailored resume with ONLY these accepted changes appli
                   <WritingIcon />
                   Tailoring Complete
                 </div>
-                <p style={{ color: '#065f46', fontSize: '15px', lineHeight: '1.6' }}>{explanation}</p>
+                <p style={{ color: '#065f46', fontSize: '15px', lineHeight: '1.6' }}>
+                  Tailored {selection?.selected_bullets.length || 0} bullets to emphasize job requirements
+                </p>
               </div>
 
               <div style={{ marginBottom: 'var(--space-xl)', textAlign: 'center' }}>
@@ -510,7 +384,7 @@ Please generate the final tailored resume with ONLY these accepted changes appli
                   </p>
                 </div>
 
-                {/* Simplified preview sections for brevity */}
+                {/* Experience sections */}
                 {tailoredResume.experience && tailoredResume.experience.map((exp, expIdx) => (
                   <div key={expIdx} style={{ marginBottom: 'var(--space-lg)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
@@ -523,16 +397,18 @@ Please generate the final tailored resume with ONLY these accepted changes appli
                     </div>
                     <ul style={{ paddingLeft: '20px' }}>
                       {exp.bullets.map((bullet, bulletIdx) => {
-                        const comparison = getBulletComparison(expIdx, bulletIdx)
-                        const isChanged = comparison.changed
+                        // Check if this bullet was rewritten
+                        const bulletId = `exp${expIdx}_bullet${bulletIdx}`
+                        const wasChanged = selection?.selected_bullets.some(b => b.bullet_id === bulletId)
+                        
                         return (
                           <li key={bulletIdx} style={{ 
                             fontSize: '14px', 
                             marginBottom: '6px',
-                            background: showComparison && isChanged ? '#fff7ed' : 'transparent',
-                            padding: showComparison && isChanged ? '4px 8px' : '0',
+                            background: showComparison && wasChanged ? '#fff7ed' : 'transparent',
+                            padding: showComparison && wasChanged ? '4px 8px' : '0',
                             borderRadius: '4px',
-                            borderLeft: showComparison && isChanged ? '3px solid #f97316' : 'none'
+                            borderLeft: showComparison && wasChanged ? '3px solid #f97316' : 'none'
                           }}>
                             {bullet}
                           </li>
@@ -549,13 +425,13 @@ Please generate the final tailored resume with ONLY these accepted changes appli
                   Download Tailored DOCX
                 </button>
                 <button 
-                  onClick={() => setTailoredResume(null)} 
+                  onClick={handleRetailor} 
                   className="btn btn-secondary"
                 >
-                  ← Back to Suggestions
+                  ← Back to Analysis
                 </button>
                 <button 
-                  onClick={() => { setTailoredResume(null); setSuggestions(null); setJobDescription(''); }} 
+                  onClick={handleStartOver}
                   className="btn btn-secondary"
                 >
                   Tailor for Another Job
