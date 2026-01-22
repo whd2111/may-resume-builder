@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
-import { ArrowLeftIcon, WritingIcon, TargetIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, WritingIcon, TargetIcon, DownloadIcon, CheckIcon } from '../utils/icons'
+import { useApplications } from '../hooks/useApplications'
 
 const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
@@ -40,12 +41,14 @@ Output the tailored resume as a valid JSON object with this structure:
 }`;
 
 function BatchTailor({ primaryResume, onBack }) {
+  const { createApplication } = useApplications()
   const [jobs, setJobs] = useState([
     { id: 1, company: '', description: '' }
   ])
   const [isTailoring, setIsTailoring] = useState(false)
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
+  const [saveOption, setSaveOption] = useState('both') // 'download', 'save', 'both'
 
   const addJob = () => {
     const newId = Math.max(...jobs.map(j => j.id), 0) + 1
@@ -101,11 +104,31 @@ function BatchTailor({ primaryResume, onBack }) {
           if (jsonMatch) {
             const tailoredData = JSON.parse(jsonMatch[0])
 
-            // Generate DOCX with company name in filename
-            await generateDOCX(tailoredData, null, companyName)
+            // Extract job title from description
+            const jobTitle = extractJobTitle(job.description)
+
+            // Download if requested
+            if (saveOption === 'download' || saveOption === 'both') {
+              await generateDOCX(tailoredData, null, companyName)
+            }
+
+            // Save to database if requested
+            if (saveOption === 'save' || saveOption === 'both') {
+              await createApplication({
+                job_description: job.description,
+                company_name: companyName,
+                job_title: jobTitle,
+                checklist_json: null,
+                selection_json: null,
+                resume_id: null,
+                tailored_resume_data: tailoredData,
+                status: 'tailored',
+              })
+            }
 
             tailoredResumes.push({
               company: companyName,
+              jobTitle: jobTitle,
               status: 'success',
               fileName: `${tailoredData.name.split(' ').pop().toUpperCase()}_${tailoredData.name.split(' ')[0].toUpperCase()}_${companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')}.docx`
             })
@@ -133,6 +156,23 @@ function BatchTailor({ primaryResume, onBack }) {
     // Try to extract company name from job description
     const match = description.match(/(?:at|for|with|@)\s+([A-Z][A-Za-z\s&]+?)(?:\s+is|\s+seeks|\s+looking|\.|,|$)/i)
     return match ? match[1].trim() : 'COMPANY'
+  }
+
+  const extractJobTitle = (description) => {
+    // Try to extract job title from description
+    const patterns = [
+      /(?:Job Title|Position|Role):\s*([^\n]+)/i,
+      /(?:hiring|seeking|looking for)\s+(?:a\s+)?([A-Z][A-Za-z\s]+?)(?:\s+to|\s+who|\s+with|\.|,)/i,
+    ]
+    
+    for (const pattern of patterns) {
+      const match = description.match(pattern)
+      if (match) {
+        return match[1].trim()
+      }
+    }
+    
+    return 'Position'
   }
 
   if (!primaryResume) {
@@ -330,6 +370,53 @@ function BatchTailor({ primaryResume, onBack }) {
               <p style={{ color: '#b91c1c' }}>{error}</p>
             </div>
           )}
+
+          <div className="card-premium" style={{ marginBottom: 'var(--space-lg)', background: 'rgba(99, 102, 241, 0.05)' }}>
+            <div style={{ marginBottom: 'var(--space-md)' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: 'var(--space-sm)',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: 'var(--text-primary)'
+              }}>
+                <CheckIcon style={{ width: '16px', height: '16px', display: 'inline', marginRight: '6px' }} />
+                Save Options
+              </label>
+              <div style={{ display: 'flex', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="saveOption" 
+                    value="both" 
+                    checked={saveOption === 'both'}
+                    onChange={(e) => setSaveOption(e.target.value)}
+                  />
+                  <span style={{ fontSize: '14px' }}>Download & Save to Dashboard</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="saveOption" 
+                    value="save" 
+                    checked={saveOption === 'save'}
+                    onChange={(e) => setSaveOption(e.target.value)}
+                  />
+                  <span style={{ fontSize: '14px' }}>Save to Dashboard Only</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="saveOption" 
+                    value="download" 
+                    checked={saveOption === 'download'}
+                    onChange={(e) => setSaveOption(e.target.value)}
+                  />
+                  <span style={{ fontSize: '14px' }}>Download Only</span>
+                </label>
+              </div>
+            </div>
+          </div>
 
           <button
             className="btn btn-primary"

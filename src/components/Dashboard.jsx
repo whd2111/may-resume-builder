@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useResumes } from '../hooks/useResumes'
 import { useStories } from '../hooks/useStories'
+import { useApplications } from '../hooks/useApplications'
 import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon } from '../utils/icons'
 import { generateDOCX } from '../utils/docxGenerator'
 
 export default function Dashboard({ onBack }) {
   const { resumes, loading: resumesLoading, deleteResume, setAsMaster } = useResumes()
   const { stories, loading: storiesLoading, createStory, updateStory, deleteStory } = useStories()
-  const [activeTab, setActiveTab] = useState('resumes') // 'resumes' or 'stories'
+  const { applications, loading: applicationsLoading, deleteApplication, updateStatus } = useApplications()
+  const [activeTab, setActiveTab] = useState('resumes') // 'resumes', 'applications', or 'stories'
   const [showAddStory, setShowAddStory] = useState(false)
   const [editingStory, setEditingStory] = useState(null)
   const [storyForm, setStoryForm] = useState({
@@ -138,7 +140,25 @@ export default function Dashboard({ onBack }) {
     setStoryForm({ ...storyForm, bullet_points: newBullets })
   }
 
-  if (resumesLoading || storiesLoading) {
+  const handleDownloadApplication = (application) => {
+    try {
+      generateDOCX(application.tailored_resume_data, null, application.company_name)
+    } catch (error) {
+      console.error('Error generating DOCX:', error)
+      alert('Failed to download resume')
+    }
+  }
+
+  const handleDeleteApplication = async (applicationId) => {
+    if (!confirm('Are you sure you want to delete this application?')) return
+    try {
+      await deleteApplication(applicationId)
+    } catch (error) {
+      alert('Failed to delete application')
+    }
+  }
+
+  if (resumesLoading || storiesLoading || applicationsLoading) {
     return (
       <div className="container">
         <div className="loading" style={{ margin: '60px auto' }} />
@@ -184,6 +204,23 @@ export default function Dashboard({ onBack }) {
           }}
         >
           My Resumes ({resumes.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('applications')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 'var(--space-md) var(--space-lg)',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: activeTab === 'applications' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            borderBottom: activeTab === 'applications' ? '2px solid var(--accent-primary)' : 'none',
+            marginBottom: '-2px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          Job Applications ({applications.length})
         </button>
         <button
           onClick={() => setActiveTab('stories')}
@@ -293,6 +330,122 @@ export default function Dashboard({ onBack }) {
                     <button 
                       className="btn btn-ghost"
                       onClick={() => handleDeleteResume(resume.id)}
+                      style={{ 
+                        fontSize: '14px', 
+                        padding: '8px 16px',
+                        color: 'var(--text-tertiary)',
+                        border: '1px solid var(--border-subtle)'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Job Applications Tab */}
+      {activeTab === 'applications' && (
+        <div>
+          {applications.length === 0 ? (
+            <div className="card-premium" style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
+              <span className="action-card-icon" style={{ margin: '0 auto var(--space-lg)' }}>
+                <TargetIcon />
+              </span>
+              <h2 style={{ fontSize: '24px', marginBottom: 'var(--space-sm)' }}>No applications yet</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>
+                Tailor your resume for specific jobs and save them here!
+              </p>
+              <button className="btn btn-primary" onClick={onBack}>
+                Tailor for a Job
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+              {applications.map((app) => (
+                <div 
+                  key={app.id}
+                  className="card-premium"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.6)',
+                    border: '1px solid var(--border-subtle)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-xs)' }}>
+                        <h3 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
+                          {app.job_title || 'Position'}
+                        </h3>
+                        <span style={{
+                          background: app.status === 'applied' ? '#10b981' : app.status === 'tailored' ? '#6366f1' : '#94a3b8',
+                          color: 'white',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          padding: '4px 10px',
+                          borderRadius: '9999px',
+                          textTransform: 'capitalize',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {app.status}
+                        </span>
+                      </div>
+                      
+                      <p style={{ fontSize: '16px', color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-xs)' }}>
+                        {app.company_name || 'Unknown Company'}
+                      </p>
+                      
+                      {app.checklist_json?.job_metadata && (
+                        <div style={{ 
+                          fontSize: '13px', 
+                          color: 'var(--text-secondary)', 
+                          marginTop: 'var(--space-sm)',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 'var(--space-md)'
+                        }}>
+                          {app.checklist_json.must_haves?.hard_skills?.length > 0 && (
+                            <span>
+                              <TargetIcon style={{ width: '14px', height: '14px', display: 'inline', marginRight: '4px' }} />
+                              {app.checklist_json.must_haves.hard_skills.slice(0, 3).join(', ')}
+                              {app.checklist_json.must_haves.hard_skills.length > 3 && '...'}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+                        Created {new Date(app.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={() => handleDownloadApplication(app)}
+                      style={{ fontSize: '14px', padding: '8px 16px' }}
+                    >
+                      <DownloadIcon />
+                      Download Resume
+                    </button>
+
+                    {app.status !== 'applied' && (
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => updateStatus(app.id, 'applied')}
+                        style={{ fontSize: '14px', padding: '8px 16px' }}
+                      >
+                        Mark as Applied
+                      </button>
+                    )}
+
+                    <button 
+                      className="btn btn-ghost"
+                      onClick={() => handleDeleteApplication(app.id)}
                       style={{ 
                         fontSize: '14px', 
                         padding: '8px 16px',

@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
-import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon } from '../utils/icons'
+import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon, CheckIcon } from '../utils/icons'
 import { extractJobChecklist } from '../utils/checklistExtractor'
 import { scoreAndSelectBullets } from '../utils/bulletScorer'
 import { CHECKLIST_TAILORING_PROMPT } from '../utils/tailoringPrompts'
+import { useApplications } from '../hooks/useApplications'
 
 function Stage2Tailor({ primaryResume, onBack }) {
+  const { createApplication } = useApplications()
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState('') // 'checklist', 'scoring', 'tailoring'
@@ -20,6 +22,8 @@ function Stage2Tailor({ primaryResume, onBack }) {
   const [showChecklist, setShowChecklist] = useState(false)
   const [showSelection, setShowSelection] = useState(false)
   const [showComparison, setShowComparison] = useState(true)
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // New checklist-based pipeline
   const handleAnalyzeWithChecklist = async (e) => {
@@ -126,6 +130,7 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
     setChecklist(null)
     setSelection(null)
     setTailoredResume(null)
+    setIsSaved(false)
   }
 
   const handleDownload = async () => {
@@ -137,6 +142,32 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
       alert('Resume downloaded successfully!')
     } catch (error) {
       alert(`Error generating document: ${error.message}`)
+    }
+  }
+
+  const handleSaveApplication = async () => {
+    if (!checklist || !tailoredResume) return
+
+    setIsSaving(true)
+    try {
+      await createApplication({
+        job_description: jobDescription,
+        company_name: checklist.job_metadata?.company_name || 'Unknown Company',
+        job_title: checklist.job_metadata?.job_title || 'Unknown Position',
+        checklist_json: checklist,
+        selection_json: selection,
+        resume_id: null, // Could link to master resume if needed
+        tailored_resume_data: tailoredResume,
+        status: 'tailored',
+      })
+
+      setIsSaved(true)
+      alert('Application saved to dashboard!')
+    } catch (error) {
+      console.error('Error saving application:', error)
+      alert(`Error saving application: ${error.message}`)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -420,9 +451,35 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
               </div>
 
               <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
-                <button onClick={handleDownload} className="btn btn-primary">
+                <button 
+                  onClick={handleSaveApplication} 
+                  className="btn btn-primary"
+                  disabled={isSaving || isSaved}
+                  style={{
+                    background: isSaved ? '#10b981' : undefined,
+                    cursor: isSaved ? 'default' : undefined
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="loading" style={{ width: '16px', height: '16px' }}></div>
+                      Saving...
+                    </>
+                  ) : isSaved ? (
+                    <>
+                      <CheckIcon />
+                      Saved to Dashboard
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon />
+                      Save to Dashboard
+                    </>
+                  )}
+                </button>
+                <button onClick={handleDownload} className="btn btn-secondary">
                   <DownloadIcon />
-                  Download Tailored DOCX
+                  Download DOCX
                 </button>
                 <button 
                   onClick={handleRetailor} 
