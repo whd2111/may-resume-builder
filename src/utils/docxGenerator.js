@@ -28,11 +28,15 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   }
   // Create the document with US Letter page size
   const rightTabPosition = 10800
-  const lineLimiter = createLineLimiter(50)
+  const lineLimiter = createLineLimiter(60)
+  const reservedSkillLines = resumeData.skills ? 2 : 0
   const docChildren = []
 
+  const canFitWithReserve = (lineCost) =>
+    lineLimiter.canFit(lineCost + reservedSkillLines)
+
   const pushParagraph = (paragraph, lineCost, { force = false } = {}) => {
-    if (force || lineLimiter.canFit(lineCost)) {
+    if (force || canFitWithReserve(lineCost)) {
       docChildren.push(paragraph)
       lineLimiter.consume(lineCost)
     }
@@ -97,11 +101,16 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
 
   // Education entries
   docChildren.push(
-    ...generateEducationSection(resumeData.education, rightTabPosition, lineLimiter)
+    ...generateEducationSection(
+      resumeData.education,
+      rightTabPosition,
+      lineLimiter,
+      reservedSkillLines
+    )
   )
 
   // Experience Section Header
-  if (lineLimiter.canFit(1)) {
+  if (canFitWithReserve(1)) {
     pushParagraph(
       new Paragraph({
         children: [
@@ -127,14 +136,17 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
 
   // Experience entries
   docChildren.push(
-    ...generateExperienceSection(resumeData.experience, rightTabPosition, lineLimiter)
+    ...generateExperienceSection(
+      resumeData.experience,
+      rightTabPosition,
+      lineLimiter,
+      reservedSkillLines
+    )
   )
 
   // Skills/Additional Info Section
   docChildren.push(
-    ...(resumeData.skills
-      ? generateSkillsSection(resumeData.skills, lineLimiter)
-      : [])
+    ...(resumeData.skills ? generateSkillsSection(resumeData.skills, lineLimiter) : [])
   )
 
   const doc = new Document({
@@ -194,13 +206,20 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   saveAs(blob, filename)
 }
 
-function generateEducationSection(education, rightTabPosition, lineLimiter) {
+function generateEducationSection(
+  education,
+  rightTabPosition,
+  lineLimiter,
+  reservedSkillLines
+) {
   if (!education || education.length === 0) return []
 
   const elements = []
+  const canFitWithReserve = (lineCost) =>
+    lineLimiter.canFit(lineCost + reservedSkillLines)
 
   for (const edu of education) {
-    if (!lineLimiter.canFit(2)) break
+    if (!canFitWithReserve(2)) break
     // Institution name (left) and location (right) on same line
     elements.push(
       new Paragraph({
@@ -231,7 +250,7 @@ function generateEducationSection(education, rightTabPosition, lineLimiter) {
     lineLimiter.consume(1)
 
     // Degree (left) and dates (right) on same line
-    if (!lineLimiter.canFit(1)) break
+    if (!canFitWithReserve(1)) break
     elements.push(
       new Paragraph({
         children: [
@@ -261,7 +280,8 @@ function generateEducationSection(education, rightTabPosition, lineLimiter) {
 
     // Details if present
     if (edu.details) {
-      if (!lineLimiter.canFit(estimateLines(edu.details, 80))) break
+      const detailLines = estimateLines(edu.details, 85)
+      if (!canFitWithReserve(detailLines)) break
       elements.push(
         new Paragraph({
           children: [
@@ -274,20 +294,27 @@ function generateEducationSection(education, rightTabPosition, lineLimiter) {
           spacing: { after: 160 }
         })
       )
-      lineLimiter.consume(estimateLines(edu.details, 80))
+      lineLimiter.consume(detailLines)
     }
   }
 
   return elements
 }
 
-function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
+function generateExperienceSection(
+  experience,
+  rightTabPosition,
+  lineLimiter,
+  reservedSkillLines
+) {
   if (!experience || experience.length === 0) return []
 
   const elements = []
+  const canFitWithReserve = (lineCost) =>
+    lineLimiter.canFit(lineCost + reservedSkillLines)
 
   for (const exp of experience) {
-    if (!lineLimiter.canFit(2)) break
+    if (!canFitWithReserve(2)) break
     // Company name (left) and location (right) on same line
     elements.push(
       new Paragraph({
@@ -318,7 +345,7 @@ function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
     lineLimiter.consume(1)
 
     // Title (left) and dates (right) on same line
-    if (!lineLimiter.canFit(1)) break
+    if (!canFitWithReserve(1)) break
     elements.push(
       new Paragraph({
         children: [
@@ -350,8 +377,9 @@ function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
     // Bullets
     if (exp.bullets && exp.bullets.length > 0) {
       for (const bullet of exp.bullets) {
-        const bulletLines = estimateLines(bullet, 70)
-        if (!lineLimiter.canFit(bulletLines)) break
+        const trimmedBullet = truncateToLines(bullet, 72, 2)
+        const bulletLines = estimateLines(trimmedBullet, 72)
+        if (!canFitWithReserve(bulletLines)) break
         elements.push(
           new Paragraph({
             numbering: {
@@ -360,7 +388,7 @@ function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
             },
             children: [
               new TextRun({
-                text: bullet,
+                text: trimmedBullet,
                 size: 20
               })
             ],
@@ -378,8 +406,10 @@ function generateExperienceSection(experience, rightTabPosition, lineLimiter) {
 function generateSkillsSection(skills, lineLimiter) {
   if (!lineLimiter.canFit(2)) return []
 
-  const linesForSkills = estimateLines(skills, 80)
-  if (!lineLimiter.canFit(1 + linesForSkills)) return []
+  const availableLines = lineLimiter.remaining()
+  const maxSkillLines = Math.max(1, availableLines - 1)
+  const trimmedSkills = truncateToLines(skills, 85, maxSkillLines)
+  const linesForSkills = estimateLines(trimmedSkills, 85)
 
   lineLimiter.consume(1)
   lineLimiter.consume(linesForSkills)
@@ -411,7 +441,7 @@ function generateSkillsSection(skills, lineLimiter) {
           bold: true
         }),
         new TextRun({
-          text: skills,
+          text: trimmedSkills,
           size: 22
         })
       ],
@@ -427,6 +457,9 @@ function createLineLimiter(maxLines) {
     canFit(lines) {
       return usedLines + lines <= maxLines
     },
+    remaining() {
+      return Math.max(0, maxLines - usedLines)
+    },
     consume(lines) {
       usedLines += lines
     }
@@ -437,4 +470,19 @@ function estimateLines(text, maxCharsPerLine) {
   if (!text) return 1
   const normalized = String(text).replace(/\s+/g, ' ').trim()
   return Math.max(1, Math.ceil(normalized.length / maxCharsPerLine))
+}
+
+function truncateToLines(text, maxCharsPerLine, maxLines) {
+  if (!text) return ''
+  const normalized = String(text).replace(/\s+/g, ' ').trim()
+  const maxChars = maxCharsPerLine * maxLines
+  if (normalized.length <= maxChars) return normalized
+
+  const cutoff = Math.max(0, maxChars - 3)
+  let truncated = normalized.slice(0, cutoff)
+  const lastSpace = truncated.lastIndexOf(' ')
+  if (lastSpace > maxCharsPerLine) {
+    truncated = truncated.slice(0, lastSpace)
+  }
+  return `${truncated.trim()}...`
 }
