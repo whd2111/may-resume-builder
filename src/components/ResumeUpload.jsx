@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import mammoth from 'mammoth'
+import MetricPrompter from './MetricPrompter'
 
 const REWRITE_PROMPT = `You are May, an expert resume rewriter. You've been given a resume to improve using professional best practices.
 
@@ -62,6 +63,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const [file, setFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
+  const [showMetricPrompter, setShowMetricPrompter] = useState(false)
   const [improvements, setImprovements] = useState('')
   const [error, setError] = useState('')
 
@@ -120,6 +122,12 @@ function ResumeUpload({ onResumeComplete, onBack }) {
         const result = JSON.parse(jsonMatch[0])
         setRewrittenResume(result.data)
         setImprovements(result.improvements || 'Resume rewritten successfully!')
+
+        // Check if resume has [ADD METRIC] placeholders
+        const hasMetrics = JSON.stringify(result.data).includes('[ADD METRIC]')
+        if (hasMetrics) {
+          setShowMetricPrompter(true)
+        }
       } else {
         throw new Error('Could not parse rewritten resume')
       }
@@ -143,11 +151,36 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     onResumeComplete(rewrittenResume)
   }
 
+  const handleMetricsComplete = async (updatedResumeData) => {
+    // Update the rewritten resume with filled-in metrics
+    setRewrittenResume(updatedResumeData)
+    setShowMetricPrompter(false)
+
+    // Regenerate DOCX with the updated metrics
+    await generateDOCX(updatedResumeData)
+  }
+
+  const handleSkipMetrics = () => {
+    setShowMetricPrompter(false)
+  }
+
   const handleStartOver = () => {
     setFile(null)
     setRewrittenResume(null)
+    setShowMetricPrompter(false)
     setImprovements('')
     setError('')
+  }
+
+  // Show metric prompter if resume has [ADD METRIC] placeholders
+  if (showMetricPrompter && rewrittenResume) {
+    return (
+      <MetricPrompter
+        resumeData={rewrittenResume}
+        onComplete={handleMetricsComplete}
+        onSkip={handleSkipMetrics}
+      />
+    )
   }
 
   return (

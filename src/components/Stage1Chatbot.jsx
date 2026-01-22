@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
+import MetricPrompter from './MetricPrompter'
 
 const SYSTEM_PROMPT = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their primary 1-page resume.
 
@@ -149,6 +150,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showMetricPrompter, setShowMetricPrompter] = useState(false)
   const [isReviewing, setIsReviewing] = useState(false)
   const [review, setReview] = useState(null)
   const [generatedResumeData, setGeneratedResumeData] = useState(null)
@@ -157,6 +159,45 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const startReview = async (resumeData) => {
+    setIsReviewing(true)
+
+    try {
+      // Get AI review
+      const reviewPrompt = formatResumeForReview(resumeData)
+      const reviewResponse = await callClaude(
+        null,
+        [{ role: 'user', content: `Please review this resume and provide detailed feedback:\n\n${reviewPrompt}` }],
+        REVIEWER_SYSTEM_PROMPT
+      )
+
+      setReview(reviewResponse)
+    } catch (error) {
+      console.error('Error getting review:', error)
+      setReview('Error getting review. Please try again.')
+    } finally {
+      setIsReviewing(false)
+    }
+  }
+
+  const handleMetricsComplete = async (updatedResumeData) => {
+    // Update the stored resume data
+    setGeneratedResumeData(updatedResumeData)
+    setShowMetricPrompter(false)
+
+    // Regenerate DOCX with the updated metrics
+    await generateDOCX(updatedResumeData)
+
+    // Now show the review
+    startReview(updatedResumeData)
+  }
+
+  const handleSkipMetrics = () => {
+    setShowMetricPrompter(false)
+    // Use the original resume data without metrics
+    startReview(generatedResumeData)
+  }
 
   const handleSendMessage = async (e) => {
     e.preventDefault()
@@ -197,21 +238,20 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
             // Generate DOCX
             await generateDOCX(resumeData.data)
 
-            // Save resume data for review
+            // Save resume data
             setGeneratedResumeData(resumeData.data)
             setIsGenerating(false)
-            setIsReviewing(true)
 
-            // Get AI review
-            const reviewPrompt = formatResumeForReview(resumeData.data)
-            const reviewResponse = await callClaude(
-              null,
-              [{ role: 'user', content: `Please review this resume and provide detailed feedback:\n\n${reviewPrompt}` }],
-              REVIEWER_SYSTEM_PROMPT
-            )
+            // Check if resume has [ADD METRIC] placeholders
+            const hasMetrics = JSON.stringify(resumeData.data).includes('[ADD METRIC]')
 
-            setReview(reviewResponse)
-            setIsReviewing(false)
+            if (hasMetrics) {
+              // Show metric prompter to fill in missing metrics
+              setShowMetricPrompter(true)
+            } else {
+              // No metrics to add, go straight to review
+              startReview(resumeData.data)
+            }
           }
         } catch (error) {
           console.error('Error parsing resume data:', error)
@@ -231,6 +271,17 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show metric prompter if needed
+  if (showMetricPrompter && generatedResumeData) {
+    return (
+      <MetricPrompter
+        resumeData={generatedResumeData}
+        onComplete={handleMetricsComplete}
+        onSkip={handleSkipMetrics}
+      />
+    )
   }
 
   if (isGenerating) {
