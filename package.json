@@ -1,7 +1,7 @@
 {
   "name": "may-resume-builder",
   "version": "1.0.0",
-  "description": "AI-powered resume builder with job-specific tailoring",
+  "description": "AI-Era Resume with job-specific tailoring",
   "private": true,
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",

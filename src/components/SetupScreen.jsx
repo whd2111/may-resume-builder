@@ -14,7 +14,7 @@ function SetupScreen({ onApiKeySubmit, hasExistingResume }) {
     <div className="container">
       <div className="header">
         <div className="logo">May</div>
-        <p className="tagline">Your AI-Powered Resume Builder</p>
+        <p className="tagline">Your AI-Era Resume</p>
       </div>
 
       {hasExistingResume && (

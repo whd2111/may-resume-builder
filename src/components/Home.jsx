@@ -56,7 +56,7 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
         </div>
 
         <h1 className="logo">May</h1>
-        <p className="tagline">Your AI-powered resume builder</p>
+        <p className="tagline">Your AI-Era Resume</p>
         
         {user && hasPrimaryResume && (
           <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', marginTop: 'var(--space-sm)' }}>
