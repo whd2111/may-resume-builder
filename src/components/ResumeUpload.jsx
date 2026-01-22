@@ -2,8 +2,12 @@ import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import mammoth from 'mammoth'
+import * as pdfjsLib from 'pdfjs-dist'
 import MetricPrompter from './MetricPrompter'
 import { ArrowLeftIcon, DownloadIcon, WritingIcon } from '../utils/icons'
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 // ... existing prompts ...
 
@@ -99,11 +103,11 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0]
     if (selectedFile) {
-      if (selectedFile.name.endsWith('.docx')) {
+      if (selectedFile.name.endsWith('.docx') || selectedFile.name.endsWith('.pdf')) {
         setFile(selectedFile)
         setError('')
       } else {
-        setError('Please upload a .docx file')
+        setError('Please upload a .docx or .pdf file')
       }
     }
   }
@@ -112,11 +116,11 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     e.preventDefault()
     const droppedFile = e.dataTransfer.files?.[0]
     if (droppedFile) {
-      if (droppedFile.name.endsWith('.docx')) {
+      if (droppedFile.name.endsWith('.docx') || droppedFile.name.endsWith('.pdf')) {
         setFile(droppedFile)
         setError('')
       } else {
-        setError('Please upload a .docx file')
+        setError('Please upload a .docx or .pdf file')
       }
     }
   }
@@ -131,6 +135,22 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     return result.value
   }
 
+  const parsePdf = async (file) => {
+    const arrayBuffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let text = ''
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items.map(item => item.str).join(' ')
+      text += pageText + '\n'
+    }
+    
+    return text
+  }
+
   const handleRewrite = async () => {
     if (!file) return
 
@@ -138,8 +158,13 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     setError('')
 
     try {
-      // Parse DOCX file
-      const resumeText = await parseDocx(file)
+      // Parse file based on type
+      let resumeText
+      if (file.name.endsWith('.pdf')) {
+        resumeText = await parsePdf(file)
+      } else {
+        resumeText = await parseDocx(file)
+      }
 
       // Send to Claude for rewriting
       const prompt = `Here is the resume to rewrite:\n\n${resumeText}\n\nPlease rewrite this resume following best practices.`
@@ -246,12 +271,15 @@ function ResumeUpload({ onResumeComplete, onBack }) {
               </div>
               <h3 className="action-card-title" style={{ textAlign: 'center' }}>Upload your resume</h3>
               <p className="action-card-description" style={{ textAlign: 'center' }}>
-                Click to browse or drag and drop your .docx file here
+                Click to browse or drag and drop your .docx or .pdf file here
+              </p>
+              <p className="action-card-description" style={{ textAlign: 'center', fontSize: '13px', marginTop: '8px', color: 'var(--text-secondary)' }}>
+                💡 Tip: .docx files work best for accurate formatting
               </p>
               <input
                 id="file-input"
                 type="file"
-                accept=".docx"
+                accept=".docx,.pdf"
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
               />
