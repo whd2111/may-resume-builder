@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { callClaude } from '../utils/claudeApi'
 import mammoth from 'mammoth'
+import * as pdfjsLib from 'pdfjs-dist'
 import { ArrowLeftIcon, UploadIcon, CheckIcon, XIcon } from '../utils/icons'
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 
 // System prompt for analyzing resumes
 const ANALYZE_RESUME_PROMPT = `You are an expert resume analyzer. Analyze the provided resume and extract:
@@ -47,16 +51,20 @@ function ResumeBankUpload({ onBack }) {
 
   const handleFileSelect = (e) => {
     const selectedFiles = Array.from(e.target.files || [])
-    const docxFiles = selectedFiles.filter(f => f.name.endsWith('.docx'))
-    setFiles(docxFiles)
+    const resumeFiles = selectedFiles.filter(f => 
+      f.name.endsWith('.docx') || f.name.endsWith('.pdf')
+    )
+    setFiles(resumeFiles)
     setResults([])
   }
 
   const handleDrop = (e) => {
     e.preventDefault()
     const droppedFiles = Array.from(e.dataTransfer.files || [])
-    const docxFiles = droppedFiles.filter(f => f.name.endsWith('.docx'))
-    setFiles(docxFiles)
+    const resumeFiles = droppedFiles.filter(f => 
+      f.name.endsWith('.docx') || f.name.endsWith('.pdf')
+    )
+    setFiles(resumeFiles)
     setResults([])
   }
 
@@ -70,10 +78,31 @@ function ResumeBankUpload({ onBack }) {
     return result.value
   }
 
+  const parsePdf = async (file) => {
+    const arrayBuffer = await file.arrayBuffer()
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+    let text = ''
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      const pageText = content.items.map(item => item.str).join(' ')
+      text += pageText + '\n'
+    }
+    
+    return text
+  }
+
   const processResume = async (file) => {
     try {
-      // Parse the DOCX
-      const resumeText = await parseDocx(file)
+      // Parse the file based on type
+      let resumeText
+      if (file.name.endsWith('.pdf')) {
+        resumeText = await parsePdf(file)
+      } else {
+        resumeText = await parseDocx(file)
+      }
 
       // Send to Claude for analysis
       const prompt = `Analyze this resume:\n\n${resumeText}`
@@ -186,18 +215,18 @@ function ResumeBankUpload({ onBack }) {
           <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-warm)' }}>
             <UploadIcon />
           </div>
-          <h3 className="action-card-title" style={{ textAlign: 'center' }}>
+              <h3 className="action-card-title" style={{ textAlign: 'center' }}>
             Upload Resume Examples
           </h3>
           <p className="action-card-description" style={{ textAlign: 'center', maxWidth: '500px', margin: '0 auto' }}>
-            Click to browse or drag and drop multiple .docx files here.
+            Click to browse or drag and drop multiple .pdf or .docx files here.
             <br />
             Each resume will be analyzed and added to May's learning bank.
           </p>
           <input
             id="batch-file-input"
             type="file"
-            accept=".docx"
+            accept=".docx,.pdf"
             multiple
             onChange={handleFileSelect}
             style={{ display: 'none' }}
@@ -376,18 +405,18 @@ function ResumeBankUpload({ onBack }) {
 
       {/* Info box */}
       <div className="card-premium stagger-2">
-        <div className="card-title">How it works</div>
-        <div className="info-box-text" style={{ fontSize: '15px', lineHeight: '1.8' }}>
-          1. <strong>Upload:</strong> Drag and drop multiple resume .docx files
-          <br />
-          2. <strong>Analysis:</strong> May analyzes each resume for quality, structure, and best practices
-          <br />
-          3. <strong>Categorization:</strong> Automatically categorized by industry, level, and function
-          <br />
-          4. <strong>Learning:</strong> High-quality resumes (4-5 stars) become featured examples
-          <br />
-          5. <strong>Application:</strong> May uses these patterns to improve future resume writing
-        </div>
+            <div className="card-title">How it works</div>
+            <div className="info-box-text" style={{ fontSize: '15px', lineHeight: '1.8' }}>
+              1. <strong>Upload:</strong> Drag and drop multiple resume .pdf or .docx files
+              <br />
+              2. <strong>Analysis:</strong> May analyzes each resume for quality, structure, and best practices
+              <br />
+              3. <strong>Categorization:</strong> Automatically categorized by industry, level, and function
+              <br />
+              4. <strong>Learning:</strong> High-quality resumes (4-5 stars) become featured examples
+              <br />
+              5. <strong>Application:</strong> May uses these patterns to improve future resume writing
+            </div>
       </div>
     </div>
   )
