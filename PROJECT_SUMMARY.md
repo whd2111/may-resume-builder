@@ -193,7 +193,7 @@ You mentioned this is a prototype, but here are ideas if you want to expand:
 - English language only
 - Requires internet connection for AI features
 
-## ✨ What Makes This Special
+## ✍️ What Makes This Special
 
 Unlike other resume builders, May:
 - **Asks intelligent follow-ups** to extract your best achievements

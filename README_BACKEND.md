@@ -270,4 +270,4 @@ All code is written, tested, and documented. Just follow the setup guide and you
 
 **Built with Claude Sonnet 4.5** 🤖
 
-May your resumes be flawless and your job offers plentiful! 💼✨
+May your resumes be flawless and your job offers plentiful! 💼✍️

@@ -4,7 +4,7 @@ import { SparklesIcon, TargetIcon, SearchIcon } from '../utils/icons'
 import { useAuth } from '../contexts/AuthContext'
 import AuthModal from './auth/AuthModal'
 
-function Home({ onNavigate, user, hasMasterResume }) {
+function Home({ onNavigate, user, hasPrimaryResume }) {
   const { signOut } = useAuth()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -58,9 +58,9 @@ function Home({ onNavigate, user, hasMasterResume }) {
         <h1 className="logo">May</h1>
         <p className="tagline">Your AI-powered resume builder</p>
         
-        {user && hasMasterResume && (
+        {user && hasPrimaryResume && (
           <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', marginTop: 'var(--space-sm)' }}>
-            ✓ Master resume saved
+            ✓ Main resume saved
           </p>
         )}
       </div>

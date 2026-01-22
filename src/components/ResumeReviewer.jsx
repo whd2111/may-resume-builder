@@ -47,13 +47,13 @@ Provide your review in this structure:
 
 Be direct, specific, and provide examples of how to improve weak bullets.`;
 
-function ResumeReviewer({ masterResume, onBack }) {
+function ResumeReviewer({ primaryResume, onBack }) {
   const [review, setReview] = useState(null)
   const [isReviewing, setIsReviewing] = useState(false)
   const [error, setError] = useState('')
 
   const handleReview = async () => {
-    if (!masterResume) {
+    if (!primaryResume) {
       setError('No resume found. Please build a resume first.')
       return
     }
@@ -63,7 +63,7 @@ function ResumeReviewer({ masterResume, onBack }) {
 
     try {
       // Format resume data for review
-      const resumeText = formatResumeForReview(masterResume)
+      const resumeText = formatResumeForReview(primaryResume)
 
       const response = await callClaude(
         null,
@@ -121,7 +121,7 @@ function ResumeReviewer({ masterResume, onBack }) {
     return text
   }
 
-  if (!masterResume) {
+  if (!primaryResume) {
     return (
       <div className="container">
         <div className="page-header">

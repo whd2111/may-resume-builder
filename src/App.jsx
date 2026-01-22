@@ -10,7 +10,7 @@ import ResumeLibrary from './components/ResumeLibrary'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
-  const { masterResume, createResume, updateResume, setAsMaster, loading: resumesLoading } = useResumes()
+  const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library'
 
   // Show loading state while auth is initializing
@@ -33,9 +33,9 @@ function App() {
     if (!user) return
 
     try {
-      // If there's already a master resume, update it; otherwise create new
-      if (isMaster && masterResume) {
-        await updateResume(masterResume.id, {
+      // If there's already a primary resume, update it; otherwise create new
+      if (isMaster && primaryResume) {
+        await updateResume(primaryResume.id, {
           resume_data: resumeData,
           title: title,
         })
@@ -59,7 +59,7 @@ function App() {
         <Home 
           onNavigate={handleNavigate}
           user={user}
-          hasMasterResume={!!masterResume}
+          hasPrimaryResume={!!primaryResume}
         />
       )}
 
@@ -67,14 +67,14 @@ function App() {
         <BuildResume
           onResumeComplete={handleResumeComplete}
           onBack={handleBack}
-          existingResume={masterResume?.resume_data}
+          existingResume={primaryResume?.resume_data}
           user={user}
         />
       )}
 
       {page === 'tailor' && (
         <TailorJobs
-          masterResume={masterResume?.resume_data}
+          primaryResume={primaryResume?.resume_data}
           onBack={handleBack}
           user={user}
         />
@@ -82,7 +82,7 @@ function App() {
 
       {page === 'review' && (
         <ResumeReviewer
-          masterResume={masterResume?.resume_data}
+          primaryResume={primaryResume?.resume_data}
           onBack={handleBack}
           user={user}
         />

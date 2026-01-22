@@ -42,7 +42,7 @@ Respond with a JSON object in this EXACT format:
   "explanation": "Brief explanation of key changes made to tailor this resume"
 }`;
 
-function Stage2Tailor({ masterResume, onBack }) {
+function Stage2Tailor({ primaryResume, onBack }) {
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [tailoredResume, setTailoredResume] = useState(null)
@@ -59,7 +59,7 @@ function Stage2Tailor({ masterResume, onBack }) {
 
     try {
       const prompt = `Here is the primary 1-page resume data:
-${JSON.stringify(masterResume, null, 2)}
+${JSON.stringify(primaryResume, null, 2)}
 
 Here is the job description:
 ${jobDescription}
@@ -99,9 +99,9 @@ Please tailor this resume for the job description.`
 
   // Helper to check if bullet changed
   const getBulletComparison = (expIndex, bulletIndex) => {
-    if (!masterResume.experience[expIndex]) return { changed: false, original: null }
+    if (!primaryResume.experience[expIndex]) return { changed: false, original: null }
 
-    const originalBullets = masterResume.experience[expIndex].bullets || []
+    const originalBullets = primaryResume.experience[expIndex].bullets || []
     const tailoredBullets = tailoredResume.experience[expIndex].bullets || []
 
     const original = originalBullets[bulletIndex]
@@ -129,7 +129,7 @@ Please tailor this resume for the job description.`
       <div className="page-header">
         <h1 className="page-title">Tailor Your Resume</h1>
         <p className="page-subtitle">
-          {masterResume
+          {primaryResume
             ? "Paste a job description and May will customize your resume to match the requirements"
             : "You need to build a primary 1-page resume first before tailoring"}
         </p>

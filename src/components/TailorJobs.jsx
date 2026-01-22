@@ -3,13 +3,13 @@ import Stage2Tailor from './Stage2Tailor'
 import BatchTailor from './BatchTailor'
 import { ArrowLeftIcon, TargetIcon, SparklesIcon } from '../utils/icons'
 
-function TailorJobs({ masterResume, onBack }) {
+function TailorJobs({ primaryResume, onBack }) {
   const [mode, setMode] = useState(null) // null, 'single', 'batch'
 
   if (mode === 'single') {
     return (
       <Stage2Tailor
-        masterResume={masterResume}
+          primaryResume={primaryResume}
         onBack={() => setMode(null)}
       />
     )
@@ -18,13 +18,13 @@ function TailorJobs({ masterResume, onBack }) {
   if (mode === 'batch') {
     return (
       <BatchTailor
-        masterResume={masterResume}
+          primaryResume={primaryResume}
         onBack={() => setMode(null)}
       />
     )
   }
 
-  if (!masterResume) {
+  if (!primaryResume) {
     return (
       <div className="container">
         <div className="page-header">

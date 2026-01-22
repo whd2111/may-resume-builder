@@ -30,7 +30,7 @@ Output the tailored resume as a valid JSON object with this structure:
   "additional": "..."
 }`;
 
-function BatchTailor({ masterResume, onBack }) {
+function BatchTailor({ primaryResume, onBack }) {
   const [jobs, setJobs] = useState([
     { id: 1, company: '', description: '' }
   ])
@@ -53,7 +53,7 @@ function BatchTailor({ masterResume, onBack }) {
   }
 
   const handleBatchTailor = async () => {
-    if (!masterResume) {
+    if (!primaryResume) {
       setError('No primary 1-page resume found. Please build a resume first.')
       return
     }
@@ -79,7 +79,7 @@ function BatchTailor({ masterResume, onBack }) {
 
         try {
           // Call Claude to tailor the resume
-          const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${job.description}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
+          const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(primaryResume, null, 2)}\n\nHere is the job description:\n\n${job.description}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
 
           const response = await callClaude(
             null,
@@ -126,7 +126,7 @@ function BatchTailor({ masterResume, onBack }) {
     return match ? match[1].trim() : 'COMPANY'
   }
 
-  if (!masterResume) {
+  if (!primaryResume) {
     return (
       <div className="container">
         <div className="page-header">

@@ -25,8 +25,8 @@ export default function ResumeLibrary({ onBack, onSelectResume }) {
     try {
       await setAsMaster(resumeId)
     } catch (error) {
-      console.error('Error setting master resume:', error)
-      alert('Failed to set as master resume')
+      console.error('Error setting main resume:', error)
+      alert('Failed to set as main resume')
     }
   }
 
@@ -126,7 +126,7 @@ export default function ResumeLibrary({ onBack, onSelectResume }) {
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px'
                       }}>
-                        Master
+                        Main
                       </span>
                     )}
                   </div>
@@ -165,7 +165,7 @@ export default function ResumeLibrary({ onBack, onSelectResume }) {
                     onClick={() => handleSetAsMaster(resume.id)}
                     style={{ fontSize: '14px', padding: '8px 16px' }}
                   >
-                    Set as Master
+                    Set as Main
                   </button>
                 )}
 
