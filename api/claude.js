@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   // Get API key from server-side environment variable
-  const apiKey = process.env.VITE_ANTHROPIC_API
+  const apiKey = process.env.VITE_ANTHROPIC
 
   if (!apiKey) {
     return res.status(500).json({ error: 'API key not configured' })
