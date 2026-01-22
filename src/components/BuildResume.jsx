@@ -18,6 +18,7 @@ function BuildResume({ onResumeComplete, onBack, existingResume }) {
   if (mode === 'upload') {
     return (
       <ResumeUpload
+        onResumeComplete={onResumeComplete}
         onBack={() => setMode(null)}
       />
     )

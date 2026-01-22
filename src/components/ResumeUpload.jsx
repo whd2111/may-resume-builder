@@ -58,7 +58,7 @@ Respond with a JSON object in this EXACT format:
   "improvements": "Brief summary of the main improvements made"
 }`;
 
-function ResumeUpload({ onBack }) {
+function ResumeUpload({ onResumeComplete, onBack }) {
   const [file, setFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
@@ -136,6 +136,11 @@ function ResumeUpload({ onBack }) {
     } catch (err) {
       setError(`Error generating document: ${err.message}`)
     }
+  }
+
+  const handleSaveAsPrimary = () => {
+    // Save the rewritten resume as the primary resume
+    onResumeComplete(rewrittenResume)
   }
 
   const handleStartOver = () => {
@@ -264,12 +269,22 @@ function ResumeUpload({ onBack }) {
             </div>
           </div>
 
+          <div className="info-box" style={{ marginBottom: 'var(--space-lg)' }}>
+            <div className="info-box-title">💡 Save this as your primary resume?</div>
+            <div className="info-box-text">
+              Click "Save as Primary Resume" to save this rewritten version. You'll then be able to tailor it for specific jobs or get it reviewed.
+            </div>
+          </div>
+
           <div className="button-group">
             <button className="btn btn-secondary" onClick={handleStartOver}>
               Upload Another Resume
             </button>
-            <button className="btn btn-primary" onClick={handleDownload}>
-              Download Rewritten Resume
+            <button className="btn btn-secondary" onClick={handleDownload}>
+              Download DOCX
+            </button>
+            <button className="btn btn-primary" onClick={handleSaveAsPrimary}>
+              Save as Primary Resume
             </button>
           </div>
         </>
