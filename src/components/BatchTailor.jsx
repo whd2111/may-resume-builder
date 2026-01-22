@@ -3,8 +3,6 @@ import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import { ArrowLeftIcon, SparklesIcon, TargetIcon, DownloadIcon } from '../utils/icons'
 
-// ... existing prompts ...
-
 const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
 TAILORING RULES:
@@ -33,10 +31,26 @@ Output the tailored resume as a valid JSON object with this structure:
 }`;
 
 function BatchTailor({ masterResume, onBack }) {
-  const [jobDescriptions, setJobDescriptions] = useState('')
+  const [jobs, setJobs] = useState([
+    { id: 1, company: '', description: '' }
+  ])
   const [isTailoring, setIsTailoring] = useState(false)
   const [results, setResults] = useState([])
   const [error, setError] = useState('')
+
+  const addJob = () => {
+    const newId = Math.max(...jobs.map(j => j.id), 0) + 1
+    setJobs([...jobs, { id: newId, company: '', description: '' }])
+  }
+
+  const removeJob = (id) => {
+    if (jobs.length === 1) return // Keep at least one job
+    setJobs(jobs.filter(j => j.id !== id))
+  }
+
+  const updateJob = (id, field, value) => {
+    setJobs(jobs.map(j => j.id === id ? { ...j, [field]: value } : j))
+  }
 
   const handleBatchTailor = async () => {
     if (!masterResume) {
@@ -44,7 +58,10 @@ function BatchTailor({ masterResume, onBack }) {
       return
     }
 
-    if (!jobDescriptions.trim()) {
+    // Filter out empty job descriptions
+    const validJobs = jobs.filter(j => j.description.trim().length > 0)
+
+    if (validJobs.length === 0) {
       setError('Please enter at least one job description.')
       return
     }
@@ -54,27 +71,15 @@ function BatchTailor({ masterResume, onBack }) {
     setResults([])
 
     try {
-      // Split job descriptions by double line breaks
-      const jobs = jobDescriptions
-        .split(/\n\s*\n/)
-        .map(jd => jd.trim())
-        .filter(jd => jd.length > 0)
-
-      if (jobs.length === 0) {
-        setError('No valid job descriptions found. Please separate job descriptions with blank lines.')
-        setIsTailoring(false)
-        return
-      }
-
       const tailoredResumes = []
 
-      for (let i = 0; i < jobs.length; i++) {
-        const jobDesc = jobs[i]
-        const jobTitle = extractJobTitle(jobDesc)
+      for (let i = 0; i < validJobs.length; i++) {
+        const job = validJobs[i]
+        const companyName = job.company.trim() || extractCompanyName(job.description)
 
         try {
           // Call Claude to tailor the resume
-          const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${jobDesc}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
+          const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${job.description}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
 
           const response = await callClaude(
             null,
@@ -87,22 +92,20 @@ function BatchTailor({ masterResume, onBack }) {
           if (jsonMatch) {
             const tailoredData = JSON.parse(jsonMatch[0])
 
-            // Generate DOCX for this tailored resume
-            await generateDOCX(tailoredData, `resume_${jobTitle.replace(/[^a-zA-Z0-9]/g, '_')}.docx`)
+            // Generate DOCX with company name in filename
+            await generateDOCX(tailoredData, null, companyName)
 
             tailoredResumes.push({
-              jobTitle,
-              jobDescription: jobDesc,
+              company: companyName,
               status: 'success',
-              fileName: `resume_${jobTitle.replace(/[^a-zA-Z0-9]/g, '_')}.docx`
+              fileName: `${tailoredData.name.split(' ').pop().toUpperCase()}_${tailoredData.name.split(' ')[0].toUpperCase()}_${companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')}.docx`
             })
           } else {
             throw new Error('Could not parse tailored resume')
           }
         } catch (err) {
           tailoredResumes.push({
-            jobTitle,
-            jobDescription: jobDesc,
+            company: companyName,
             status: 'error',
             error: err.message
           })
@@ -117,13 +120,10 @@ function BatchTailor({ masterResume, onBack }) {
     }
   }
 
-  const extractJobTitle = (jobDesc) => {
-    // Try to extract a job title from the first line or first 100 characters
-    const firstLine = jobDesc.split('\n')[0]
-    if (firstLine.length > 0 && firstLine.length < 100) {
-      return firstLine
-    }
-    return jobDesc.substring(0, 50).replace(/[^a-zA-Z0-9\s]/g, '').trim() || 'Job'
+  const extractCompanyName = (description) => {
+    // Try to extract company name from job description
+    const match = description.match(/(?:at|for|with|@)\s+([A-Z][A-Za-z\s&]+?)(?:\s+is|\s+seeks|\s+looking|\.|,|$)/i)
+    return match ? match[1].trim() : 'COMPANY'
   }
 
   if (!masterResume) {
@@ -166,54 +166,158 @@ function BatchTailor({ masterResume, onBack }) {
 
       <div className="page-header">
         <h1 className="page-title">Batch Tailor Resumes</h1>
-        <p className="page-subtitle">Create multiple tailored resumes for different jobs in one go</p>
+        <p className="page-subtitle">Create multiple tailored resumes for different jobs</p>
       </div>
 
       {!isTailoring && results.length === 0 && (
-        <div className="card-premium stagger-1">
-          <div className="card-title">
-            <TargetIcon />
-            Enter Job Descriptions
-          </div>
-          <p style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>
-            Paste multiple job descriptions below. Separate each job with a blank line.
-          </p>
-
-          <textarea
-            placeholder="Software Engineer at TechCorp&#10;Looking for a skilled engineer...&#10;&#10;Product Manager at StartupXYZ&#10;We're seeking a product manager..."
-            value={jobDescriptions}
-            onChange={(e) => setJobDescriptions(e.target.value)}
-            style={{
-              width: '100%',
-              minHeight: '300px',
-              padding: 'var(--space-md)',
-              fontSize: '16px',
-              fontFamily: 'inherit',
-              borderRadius: '24px',
-              resize: 'vertical',
-              marginBottom: 'var(--space-lg)',
-              background: 'rgba(255,255,255,0.5)'
-            }}
-          />
-
-          <div className="card-premium" style={{ marginBottom: 'var(--space-xl)', background: 'white' }}>
+        <>
+          <div className="card-premium stagger-1" style={{ marginBottom: 'var(--space-lg)', background: 'white' }}>
             <div className="card-title" style={{ fontSize: '16px' }}>
               <SparklesIcon />
               How it works:
             </div>
             <div className="info-box-text" style={{ fontSize: '14px', lineHeight: '1.7' }}>
-              • Paste each job description in the box above
+              • Add a job card for each position you're applying to
               <br />
-              • Separate different jobs with a blank line
+              • Enter the company name (optional but helps with filenames)
               <br />
-              • May will create a tailored resume for each job
+              • Paste the full job description
               <br />
-              • All resumes will download automatically
+              • May will create a perfectly tailored resume for each job
+              <br />
+              • All resumes download automatically with proper filenames
             </div>
           </div>
 
+          {jobs.map((job, index) => (
+            <div 
+              key={job.id} 
+              className="card-premium stagger-2" 
+              style={{ 
+                marginBottom: 'var(--space-lg)',
+                borderLeft: '4px solid var(--accent-primary)'
+              }}
+            >
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                marginBottom: 'var(--space-lg)'
+              }}>
+                <div className="card-title">
+                  <TargetIcon />
+                  Job {index + 1}
+                </div>
+                {jobs.length > 1 && (
+                  <button
+                    onClick={() => removeJob(job.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-tertiary)',
+                      cursor: 'pointer',
+                      fontSize: '24px',
+                      padding: '0',
+                      width: '32px',
+                      height: '32px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                      e.currentTarget.style.color = '#ef4444'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'none'
+                      e.currentTarget.style.color = 'var(--text-tertiary)'
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              <div style={{ marginBottom: 'var(--space-md)' }}>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: 'var(--space-sm)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)'
+                }}>
+                  Company Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="e.g., Electronic Arts, Google, Microsoft"
+                  value={job.company}
+                  onChange={(e) => updateJob(job.id, 'company', e.target.value)}
+                  style={{
+                    width: '100%',
+                    fontSize: '15px'
+                  }}
+                />
+                <small style={{ 
+                  display: 'block',
+                  marginTop: 'var(--space-xs)',
+                  color: 'var(--text-tertiary)',
+                  fontSize: '13px'
+                }}>
+                  Helps create better filenames: DUBBS_WILL_GOOGLE.docx
+                </small>
+              </div>
+
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: 'var(--space-sm)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: 'var(--text-primary)'
+                }}>
+                  Job Description *
+                </label>
+                <textarea
+                  placeholder="Paste the full job description here..."
+                  value={job.description}
+                  onChange={(e) => updateJob(job.id, 'description', e.target.value)}
+                  style={{
+                    width: '100%',
+                    minHeight: '200px',
+                    padding: 'var(--space-md)',
+                    fontSize: '15px',
+                    fontFamily: 'inherit',
+                    borderRadius: '16px',
+                    resize: 'vertical',
+                    background: 'rgba(255,255,255,0.5)',
+                    border: '1px solid var(--border-subtle)'
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={addJob}
+            className="btn btn-secondary"
+            style={{ 
+              width: '100%',
+              marginBottom: 'var(--space-xl)'
+            }}
+          >
+            + Add Another Job
+          </button>
+
           {error && (
-            <div className="card" style={{ borderLeft: '4px solid #ef4444', background: '#fef2f2', marginBottom: 'var(--space-lg)' }}>
+            <div className="card" style={{ 
+              borderLeft: '4px solid #ef4444', 
+              background: '#fef2f2', 
+              marginBottom: 'var(--space-lg)' 
+            }}>
               <p style={{ color: '#b91c1c' }}>{error}</p>
             </div>
           )}
@@ -222,12 +326,12 @@ function BatchTailor({ masterResume, onBack }) {
             className="btn btn-primary"
             onClick={handleBatchTailor}
             style={{ width: '100%' }}
-            disabled={!jobDescriptions.trim()}
+            disabled={jobs.every(j => !j.description.trim())}
           >
             <SparklesIcon />
-            Generate Tailored Resumes
+            Generate {jobs.filter(j => j.description.trim()).length} Tailored Resume{jobs.filter(j => j.description.trim()).length !== 1 ? 's' : ''}
           </button>
-        </div>
+        </>
       )}
 
       {isTailoring && (
@@ -242,7 +346,7 @@ function BatchTailor({ masterResume, onBack }) {
               Processing job descriptions
             </p>
             <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>
-              {results.length > 0 ? `Completed ${results.length} of ${jobDescriptions.split(/\n\s*\n/).filter(jd => jd.trim().length > 0).length}` : 'Starting batch process...'}
+              {results.length > 0 ? `Completed ${results.length} of ${jobs.filter(j => j.description.trim()).length}` : 'Starting batch process...'}
             </p>
           </div>
 
@@ -263,9 +367,9 @@ function BatchTailor({ masterResume, onBack }) {
                     justifyContent: 'space-between'
                   }}
                 >
-                  <span style={{ fontWeight: '600' }}>{result.jobTitle}</span>
+                  <span style={{ fontWeight: '600' }}>{result.company}</span>
                   {result.status === 'success' ? (
-                    <span style={{ color: '#166534', fontWeight: '500' }}>✓ {result.fileName}</span>
+                    <span style={{ color: '#166534', fontWeight: '500' }}>✓ Downloaded</span>
                   ) : (
                     <span style={{ color: '#991b1b', fontWeight: '500' }}>✗ {result.error}</span>
                   )}
@@ -305,9 +409,16 @@ function BatchTailor({ masterResume, onBack }) {
                   justifyContent: 'space-between'
                 }}
               >
-                <span>{result.jobTitle}</span>
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>{result.company}</div>
+                  {result.status === 'success' && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{result.fileName}</div>
+                  )}
+                </div>
                 {result.status === 'success' ? (
-                  <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}><DownloadIcon /></span>
+                  <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}>
+                    <DownloadIcon />
+                  </span>
                 ) : (
                   <span style={{ color: '#ef4444' }}>Error</span>
                 )}
@@ -322,7 +433,7 @@ function BatchTailor({ masterResume, onBack }) {
                 className="btn btn-primary"
                 onClick={() => {
                   setResults([])
-                  setJobDescriptions('')
+                  setJobs([{ id: 1, company: '', description: '' }])
                 }}
               >
                 Tailor More Jobs
