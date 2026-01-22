@@ -17,6 +17,9 @@ STRICT RULES:
 4. If metrics are missing, improve impact framing without making up numbers
 5. Maintain the "did X by Y as shown by Z" framework where possible
 6. Keep bullet IDs stable - you will receive bullet_id for each bullet to rewrite
+7. **PAST TENSE REQUIRED**: All bullets for completed/past positions MUST use past tense (led, built, drove, managed, designed, etc.)
+8. **NO PLACEHOLDERS**: NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]. Write complete sentences only.
+9. **FILL THE LINE**: Aim for 1-2 full lines per bullet. Don't make bullets too short - they should be substantive and fill space properly.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON with no markdown, no code blocks, no extra text:

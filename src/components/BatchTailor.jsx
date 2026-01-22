@@ -13,6 +13,10 @@ TAILORING RULES:
 5. Remove or de-emphasize less relevant bullets if needed
 6. Maintain strong action verbs and metrics
 7. Keep the same format and structure as the primary 1-page resume
+8. **PAST TENSE REQUIRED**: All bullets for completed/past positions MUST use past tense (led, built, drove, managed, designed)
+9. **NO PLACEHOLDERS**: NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]. Write complete sentences only.
+10. **FILL THE LINE**: Aim for 1-2 full lines per bullet. Don't make bullets too short.
+11. **ONE PAGE**: Ensure final resume fits on ONE PAGE maximum.
 
 IMPORTANT: Return the tailored resume in the SAME JSON format as the input, with the same structure. Only modify the content, not the format.
 
