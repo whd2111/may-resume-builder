@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useResumes } from '../hooks/useResumes'
 import { useStories } from '../hooks/useStories'
-import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon } from '../utils/icons'
+import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon, UploadIcon } from '../utils/icons'
 import { generateDOCX } from '../utils/docxGenerator'
+import ResumeBankUpload from './ResumeBankUpload'
 
 export default function Dashboard({ onBack }) {
   const { resumes, loading: resumesLoading, deleteResume, setAsMaster } = useResumes()
   const { stories, loading: storiesLoading, createStory, updateStory, deleteStory } = useStories()
-  const [activeTab, setActiveTab] = useState('resumes') // 'resumes' or 'stories'
+  const [activeTab, setActiveTab] = useState('resumes') // 'resumes', 'stories', or 'resumebank'
   const [showAddStory, setShowAddStory] = useState(false)
   const [editingStory, setEditingStory] = useState(null)
   const [storyForm, setStoryForm] = useState({
@@ -201,6 +202,23 @@ export default function Dashboard({ onBack }) {
           }}
         >
           Story Bank ({stories.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('resumebank')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 'var(--space-md) var(--space-lg)',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: activeTab === 'resumebank' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            borderBottom: activeTab === 'resumebank' ? '2px solid var(--accent-primary)' : 'none',
+            marginBottom: '-2px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <UploadIcon /> Resume Bank
         </button>
       </div>
 
@@ -690,6 +708,13 @@ export default function Dashboard({ onBack }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Resume Bank Tab */}
+      {activeTab === 'resumebank' && (
+        <div>
+          <ResumeBankUpload />
         </div>
       )}
     </div>
