@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
+import { ArrowLeftIcon, SearchIcon, SparklesIcon } from '../utils/icons'
+
+// ... existing prompts ...
 
 const REVIEWER_SYSTEM_PROMPT = `You are an expert resume reviewer with years of experience in recruiting and career coaching. Your job is to analyze resumes and provide detailed, actionable feedback.
 
@@ -122,21 +125,22 @@ function ResumeReviewer({ masterResume, onBack }) {
     return (
       <div className="container">
         <div className="page-header">
-          <button className="back-button" onClick={onBack}>
-            ← Back to Home
-          </button>
-          <h1 className="page-title">Review Resume</h1>
-          <p className="page-subtitle">Get AI-powered feedback on your resume</p>
+          {onBack && (
+            <button className="back-button" onClick={onBack}>
+              <ArrowLeftIcon />
+              Back to Home
+            </button>
+          )}
+          <h1 className="page-title">Resume Review</h1>
+          <p className="page-subtitle">Get expert AI feedback on your resume quality</p>
         </div>
 
-        <div className="card">
-          <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
-            <div className="info-box-text" style={{ color: '#c92a2a' }}>
-              No resume found. Please build a resume first before reviewing.
-            </div>
-          </div>
-          <button className="btn btn-secondary" onClick={onBack} style={{ marginTop: 'var(--space-lg)' }}>
-            Go Build a Resume
+        <div className="card-premium" style={{ borderLeft: '4px solid #ef4444' }}>
+          <p style={{ color: '#b91c1c', fontWeight: '500' }}>
+            No resume found. Please build one first to enable review.
+          </p>
+          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+            Go to Resume Builder
           </button>
         </div>
       </div>
@@ -146,20 +150,26 @@ function ResumeReviewer({ masterResume, onBack }) {
   return (
     <div className="container" style={{ maxWidth: '900px' }}>
       <div className="page-header">
-        <button className="back-button" onClick={onBack}>
-          ← Back to Home
-        </button>
-        <h1 className="page-title">Review Resume</h1>
+        {onBack && (
+          <button className="back-button" onClick={onBack}>
+            <ArrowLeftIcon />
+            Back to Home
+          </button>
+        )}
+        <h1 className="page-title">Resume Review</h1>
         <p className="page-subtitle">Get expert AI feedback on your resume quality</p>
       </div>
 
       {!review && !isReviewing && (
-        <div className="card">
-          <div className="card-title">Ready to Review</div>
-          <p style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-secondary)' }}>
-            May will analyze your resume for:
+        <div className="card-premium stagger-1">
+          <div className="card-title">
+            <SearchIcon />
+            Ready for Analysis
+          </div>
+          <p style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-secondary)', fontSize: '15px' }}>
+            May will perform a deep scan of your resume, evaluating it against industry best practices.
           </p>
-          <ul style={{ marginBottom: 'var(--space-lg)', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
+          <ul style={{ marginBottom: 'var(--space-xl)', color: 'var(--text-secondary)', lineHeight: '1.8', paddingLeft: '20px' }}>
             <li>Strong action verbs and impactful language</li>
             <li>Quantifiable metrics and results</li>
             <li>Bullet length and clarity</li>
@@ -168,10 +178,8 @@ function ResumeReviewer({ masterResume, onBack }) {
           </ul>
 
           {error && (
-            <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0', marginBottom: 'var(--space-lg)' }}>
-              <div className="info-box-text" style={{ color: '#c92a2a' }}>
-                {error}
-              </div>
+            <div className="card" style={{ borderLeft: '4px solid #ef4444', background: '#fef2f2', marginBottom: 'var(--space-lg)' }}>
+              <p style={{ color: '#b91c1c', fontSize: '14px' }}>{error}</p>
             </div>
           )}
 
@@ -180,40 +188,48 @@ function ResumeReviewer({ masterResume, onBack }) {
             onClick={handleReview}
             style={{ width: '100%' }}
           >
+            <SparklesIcon />
             Review My Resume
           </button>
         </div>
       )}
 
       {isReviewing && (
-        <div className="card" style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div className="loading" style={{ width: '60px', height: '60px', margin: '0 auto 20px' }}></div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
+          <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
+            <SearchIcon />
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
             Analyzing your resume...
           </p>
-          <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', marginTop: '10px' }}>
-            This may take 30-60 seconds
-          </p>
+          <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
         </div>
       )}
 
       {review && (
-        <div className="card-premium">
-          <div className="card-title">Resume Review</div>
-          <div style={{
-            whiteSpace: 'pre-wrap',
-            lineHeight: '1.8',
-            color: 'var(--text-primary)'
-          }}>
-            {review}
-          </div>
-          <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
-            <button className="btn btn-secondary" onClick={onBack}>
-              Back to Home
-            </button>
-            <button className="btn btn-primary" onClick={handleReview}>
-              Review Again
-            </button>
+        <div className="stagger-1">
+          <div className="card-premium">
+            <div className="card-title">
+              <SparklesIcon />
+              Detailed Feedback
+            </div>
+            <div style={{
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.8',
+              color: 'var(--text-primary)',
+              fontSize: '16px'
+            }}>
+              {review}
+            </div>
+            <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
+              <button className="btn btn-secondary" onClick={onBack}>
+                Back to Home
+              </button>
+              <button className="btn btn-primary" onClick={handleReview}>
+                <SparklesIcon />
+                Refresh Review
+              </button>
+            </div>
           </div>
         </div>
       )}

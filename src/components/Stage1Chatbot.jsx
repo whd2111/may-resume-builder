@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import MetricPrompter from './MetricPrompter'
+import { ArrowLeftIcon, SendIcon, SparklesIcon, DownloadIcon } from '../utils/icons'
+
+// ... existing prompts ...
 
 const SYSTEM_PROMPT = `You are May, an expert resume builder assistant. Your job is to have a natural conversation with the user to gather information for their primary 1-page resume.
 
@@ -296,15 +299,18 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   if (isGenerating) {
     return (
       <div className="container">
-        <div className="header">
-          <div className="logo">May</div>
+        <div className="page-header">
+          <h1 className="logo">May</h1>
           <p className="tagline">Generating Your Resume...</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div className="loading" style={{ width: '60px', height: '60px', margin: '0 auto 20px' }}></div>
-          <p style={{ color: '#666', fontSize: '18px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
+          <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
+            <SparklesIcon />
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
             Creating your professional resume document...
           </p>
+          <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
         </div>
       </div>
     )
@@ -313,15 +319,18 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   if (isReviewing) {
     return (
       <div className="container">
-        <div className="header">
-          <div className="logo">May</div>
+        <div className="page-header">
+          <h1 className="logo">May</h1>
           <p className="tagline">Reviewing Your Resume...</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div className="loading" style={{ width: '60px', height: '60px', margin: '0 auto 20px' }}></div>
-          <p style={{ color: '#666', fontSize: '18px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-3xl) var(--space-xl)' }}>
+          <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-primary)', color: 'white' }}>
+            <SparklesIcon />
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
             Analyzing your resume quality...
           </p>
+          <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
         </div>
       </div>
     )
@@ -331,29 +340,40 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
     return (
       <div className="container" style={{ maxWidth: '900px' }}>
         <div className="page-header">
-          <h1 className="page-title">Resume Created Successfully! 🎉</h1>
+          <h1 className="page-title">Resume Created! 🎉</h1>
           <p className="page-subtitle">Your resume has been downloaded. Here's May's feedback:</p>
         </div>
 
         <div className="card-premium">
-          <div className="card-title">AI Review Feedback</div>
+          <div className="card-title">
+            <SparklesIcon />
+            AI Review Feedback
+          </div>
           <div style={{
             whiteSpace: 'pre-wrap',
             lineHeight: '1.8',
             color: 'var(--text-primary)',
-            marginBottom: 'var(--space-lg)'
+            fontSize: '16px',
+            marginBottom: 'var(--space-xl)'
           }}>
             {review}
           </div>
 
           <div className="button-group">
             <button
-              className="btn btn-secondary"
+              className="btn btn-primary"
               onClick={() => {
                 onResumeComplete(generatedResumeData)
               }}
             >
-              Done
+              Done & Return Home
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={() => generateDOCX(generatedResumeData)}
+            >
+              <DownloadIcon />
+              Download Again
             </button>
           </div>
         </div>
@@ -366,7 +386,8 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
       <div className="page-header">
         {onBack && (
           <button className="back-button" onClick={onBack}>
-            ← Back to Home
+            <ArrowLeftIcon />
+            Back to Home
           </button>
         )}
         <h1 className="page-title">Build a Resume</h1>
@@ -384,14 +405,14 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
         {isLoading && (
           <div className="message assistant">
             <div className="message-content">
-              <div className="loading-spinner"></div>
+              <div className="loading"></div>
             </div>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      <form onSubmit={handleSendMessage}>
+      <form onSubmit={handleSendMessage} style={{ marginTop: 'var(--space-lg)' }}>
         <div className="input-wrapper">
           <input
             type="text"
@@ -402,7 +423,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
             disabled={isLoading}
           />
           <button type="submit" className="btn btn-primary" disabled={isLoading || !input.trim()}>
-            Send
+            <SendIcon />
           </button>
         </div>
       </form>

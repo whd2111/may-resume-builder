@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
+import { ArrowLeftIcon, SparklesIcon, TargetIcon, DownloadIcon } from '../utils/icons'
+
+// ... existing prompts ...
 
 const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
@@ -127,21 +130,22 @@ function BatchTailor({ masterResume, onBack }) {
     return (
       <div className="container">
         <div className="page-header">
-          <button className="back-button" onClick={onBack}>
-            ← Back to Home
-          </button>
+          {onBack && (
+            <button className="back-button" onClick={onBack}>
+              <ArrowLeftIcon />
+              Back to Home
+            </button>
+          )}
           <h1 className="page-title">Batch Tailor Resumes</h1>
           <p className="page-subtitle">Create multiple tailored resumes at once</p>
         </div>
 
-        <div className="card">
-          <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
-            <div className="info-box-text" style={{ color: '#c92a2a' }}>
-              No primary 1-page resume found. Please build a resume first before tailoring.
-            </div>
-          </div>
-          <button className="btn btn-secondary" onClick={onBack} style={{ marginTop: 'var(--space-lg)' }}>
-            Go Build a Resume
+        <div className="card-premium" style={{ borderLeft: '4px solid #ef4444' }}>
+          <p style={{ color: '#b91c1c', fontWeight: '500' }}>
+            No primary resume found. Please build one first to enable batch tailoring.
+          </p>
+          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+            Go to Resume Builder
           </button>
         </div>
       </div>
@@ -151,16 +155,22 @@ function BatchTailor({ masterResume, onBack }) {
   return (
     <div className="container" style={{ maxWidth: '900px' }}>
       <div className="page-header">
-        <button className="back-button" onClick={onBack}>
-          ← Back to Home
-        </button>
+        {onBack && (
+          <button className="back-button" onClick={onBack}>
+            <ArrowLeftIcon />
+            Back to Home
+          </button>
+        )}
         <h1 className="page-title">Batch Tailor Resumes</h1>
-        <p className="page-subtitle">Create multiple tailored resumes for different jobs</p>
+        <p className="page-subtitle">Create multiple tailored resumes for different jobs in one go</p>
       </div>
 
       {!isTailoring && results.length === 0 && (
-        <div className="card">
-          <div className="card-title">Enter Job Descriptions</div>
+        <div className="card-premium stagger-1">
+          <div className="card-title">
+            <TargetIcon />
+            Enter Job Descriptions
+          </div>
           <p style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>
             Paste multiple job descriptions below. Separate each job with a blank line.
           </p>
@@ -175,16 +185,19 @@ function BatchTailor({ masterResume, onBack }) {
               padding: 'var(--space-md)',
               fontSize: '16px',
               fontFamily: 'inherit',
-              border: '2px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
+              borderRadius: '24px',
               resize: 'vertical',
-              marginBottom: 'var(--space-lg)'
+              marginBottom: 'var(--space-lg)',
+              background: 'rgba(255,255,255,0.5)'
             }}
           />
 
-          <div className="info-box" style={{ marginBottom: 'var(--space-lg)' }}>
-            <div className="info-box-title">How it works:</div>
-            <div className="info-box-text">
+          <div className="card-premium" style={{ marginBottom: 'var(--space-xl)', background: 'white' }}>
+            <div className="card-title" style={{ fontSize: '16px' }}>
+              <SparklesIcon />
+              How it works:
+            </div>
+            <div className="info-box-text" style={{ fontSize: '14px', lineHeight: '1.7' }}>
               • Paste each job description in the box above
               <br />
               • Separate different jobs with a blank line
@@ -192,16 +205,12 @@ function BatchTailor({ masterResume, onBack }) {
               • May will create a tailored resume for each job
               <br />
               • All resumes will download automatically
-              <br />
-              • This may take 1-2 minutes per job
             </div>
           </div>
 
           {error && (
-            <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0', marginBottom: 'var(--space-lg)' }}>
-              <div className="info-box-text" style={{ color: '#c92a2a' }}>
-                {error}
-              </div>
+            <div className="card" style={{ borderLeft: '4px solid #ef4444', background: '#fef2f2', marginBottom: 'var(--space-lg)' }}>
+              <p style={{ color: '#b91c1c' }}>{error}</p>
             </div>
           )}
 
@@ -211,43 +220,50 @@ function BatchTailor({ masterResume, onBack }) {
             style={{ width: '100%' }}
             disabled={!jobDescriptions.trim()}
           >
+            <SparklesIcon />
             Generate Tailored Resumes
           </button>
         </div>
       )}
 
       {isTailoring && (
-        <div className="card">
-          <div className="card-title">Tailoring Resumes...</div>
-          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-            <div className="loading" style={{ width: '60px', height: '60px', margin: '0 auto 20px' }}></div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '18px', marginBottom: '10px' }}>
+        <div className="card-premium">
+          <div className="card-title">
+            <TargetIcon />
+            Tailoring Resumes...
+          </div>
+          <div style={{ textAlign: 'center', padding: 'var(--space-2xl) 0' }}>
+            <div className="loading" style={{ margin: '0 auto var(--space-xl)' }}></div>
+            <p style={{ color: 'var(--text-primary)', fontSize: '20px', fontWeight: '500', marginBottom: '8px' }}>
               Processing job descriptions
             </p>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '14px' }}>
-              {results.length > 0 ? `Completed ${results.length} of ${jobDescriptions.split(/\n\s*\n/).filter(jd => jd.trim().length > 0).length}` : 'Starting...'}
+            <p style={{ color: 'var(--text-secondary)', fontSize: '16px' }}>
+              {results.length > 0 ? `Completed ${results.length} of ${jobDescriptions.split(/\n\s*\n/).filter(jd => jd.trim().length > 0).length}` : 'Starting batch process...'}
             </p>
           </div>
 
           {results.length > 0 && (
-            <div style={{ marginTop: 'var(--space-lg)' }}>
+            <div style={{ marginTop: 'var(--space-xl)' }}>
               {results.map((result, idx) => (
                 <div
                   key={idx}
                   style={{
-                    padding: 'var(--space-md)',
-                    marginBottom: 'var(--space-sm)',
-                    background: result.status === 'success' ? '#e8f5e9' : '#ffebee',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '14px'
+                    padding: '16px',
+                    marginBottom: '10px',
+                    background: result.status === 'success' ? '#f0fdf4' : '#fef2f2',
+                    border: result.status === 'success' ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                    borderRadius: '16px',
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
                   }}
                 >
-                  <strong>{result.jobTitle}</strong>
-                  <br />
+                  <span style={{ fontWeight: '600' }}>{result.jobTitle}</span>
                   {result.status === 'success' ? (
-                    <span style={{ color: '#2e7d32' }}>✓ {result.fileName}</span>
+                    <span style={{ color: '#166534', fontWeight: '500' }}>✓ {result.fileName}</span>
                   ) : (
-                    <span style={{ color: '#c62828' }}>✗ {result.error}</span>
+                    <span style={{ color: '#991b1b', fontWeight: '500' }}>✗ {result.error}</span>
                   )}
                 </div>
               ))}
@@ -257,49 +273,57 @@ function BatchTailor({ masterResume, onBack }) {
       )}
 
       {!isTailoring && results.length > 0 && (
-        <div className="card-premium">
-          <div className="card-title">Batch Tailoring Complete!</div>
-
-          <div style={{ marginBottom: 'var(--space-lg)' }}>
-            <p style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>
-              Created {results.filter(r => r.status === 'success').length} tailored resume(s):
+        <div className="stagger-1">
+          <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
+            <div className="card-title" style={{ color: '#065f46' }}>
+              <SparklesIcon />
+              Batch Process Complete!
+            </div>
+            <p style={{ color: '#065f46', fontSize: '16px' }}>
+              Created {results.filter(r => r.status === 'success').length} tailored resume(s) successfully.
             </p>
+          </div>
 
+          <div className="card-premium">
+            <div className="card-title">Summary</div>
             {results.map((result, idx) => (
               <div
                 key={idx}
                 style={{
-                  padding: 'var(--space-md)',
-                  marginBottom: 'var(--space-sm)',
-                  background: result.status === 'success' ? '#e8f5e9' : '#ffebee',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '14px'
+                  padding: '16px',
+                  marginBottom: '10px',
+                  background: result.status === 'success' ? '#f8fafc' : '#fef2f2',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '16px',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
                 }}
               >
-                <strong>{result.jobTitle}</strong>
-                <br />
+                <span>{result.jobTitle}</span>
                 {result.status === 'success' ? (
-                  <span style={{ color: '#2e7d32' }}>✓ {result.fileName}</span>
+                  <span style={{ color: 'var(--accent-primary)', fontWeight: '600' }}><DownloadIcon /></span>
                 ) : (
-                  <span style={{ color: '#c62828' }}>✗ Failed: {result.error}</span>
+                  <span style={{ color: '#ef4444' }}>Error</span>
                 )}
               </div>
             ))}
-          </div>
 
-          <div className="button-group">
-            <button className="btn btn-secondary" onClick={onBack}>
-              Back to Home
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                setResults([])
-                setJobDescriptions('')
-              }}
-            >
-              Tailor More Jobs
-            </button>
+            <div className="button-group" style={{ marginTop: 'var(--space-2xl)' }}>
+              <button className="btn btn-secondary" onClick={onBack}>
+                Back to Home
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setResults([])
+                  setJobDescriptions('')
+                }}
+              >
+                Tailor More Jobs
+              </button>
+            </div>
           </div>
         </div>
       )}

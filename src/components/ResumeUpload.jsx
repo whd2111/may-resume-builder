@@ -3,6 +3,9 @@ import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import mammoth from 'mammoth'
 import MetricPrompter from './MetricPrompter'
+import { ArrowLeftIcon, DownloadIcon, SparklesIcon } from '../utils/icons'
+
+// ... existing prompts ...
 
 const REWRITE_PROMPT = `You are May, an expert resume rewriter. You've been given a resume to improve using professional best practices.
 
@@ -186,10 +189,13 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   return (
     <div className="container">
       <div className="page-header">
-        <button className="back-button" onClick={onBack}>
-          ← Back to Home
-        </button>
-        <h1 className="page-title">Update Your Main Resume</h1>
+        {onBack && (
+          <button className="back-button" onClick={onBack}>
+            <ArrowLeftIcon />
+            Back to Home
+          </button>
+        )}
+        <h1 className="page-title">Update Your Resume</h1>
         <p className="page-subtitle">
           Upload your existing resume and May will rewrite it using professional best practices
         </p>
@@ -199,14 +205,16 @@ function ResumeUpload({ onResumeComplete, onBack }) {
         <>
           {!file ? (
             <div
-              className="upload-area"
+              className="upload-area stagger-1"
               onClick={() => document.getElementById('file-input').click()}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
             >
-              <div className="upload-icon">📄</div>
-              <h3 className="upload-title">Upload your resume</h3>
-              <p className="upload-subtitle">
+              <div className="action-card-icon" style={{ margin: '0 auto var(--space-xl)', background: 'var(--gradient-warm)' }}>
+                <DownloadIcon />
+              </div>
+              <h3 className="action-card-title" style={{ textAlign: 'center' }}>Upload your resume</h3>
+              <p className="action-card-description" style={{ textAlign: 'center' }}>
                 Click to browse or drag and drop your .docx file here
               </p>
               <input
@@ -218,9 +226,12 @@ function ResumeUpload({ onResumeComplete, onBack }) {
               />
             </div>
           ) : (
-            <div className="card">
-              <div className="card-title">Selected File</div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>
+            <div className="card-premium stagger-1">
+              <div className="card-title">
+                <DownloadIcon />
+                Selected File
+              </div>
+              <p style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-xl)', fontSize: '18px' }}>
                 {file.name}
               </p>
               <div className="button-group">
@@ -233,11 +244,12 @@ function ResumeUpload({ onResumeComplete, onBack }) {
                   disabled={isProcessing}
                 >
                   {isProcessing ? (
-                    <>
-                      <span className="loading-spinner"></span> Rewriting...
-                    </>
+                    <div className="loading"></div>
                   ) : (
-                    'Rewrite Resume'
+                    <>
+                      <SparklesIcon />
+                      Rewrite Resume
+                    </>
                   )}
                 </button>
               </div>
@@ -245,16 +257,17 @@ function ResumeUpload({ onResumeComplete, onBack }) {
           )}
 
           {error && (
-            <div className="info-box" style={{ borderColor: '#ff6b6b', background: '#ffe0e0' }}>
-              <div className="info-box-text" style={{ color: '#c92a2a' }}>
-                {error}
-              </div>
+            <div className="card-premium" style={{ borderLeft: '4px solid #ef4444', background: '#fef2f2' }}>
+              <p style={{ color: '#b91c1c' }}>{error}</p>
             </div>
           )}
 
-          <div className="info-box">
-            <div className="info-box-title">What May will do:</div>
-            <div className="info-box-text">
+          <div className="card-premium stagger-2">
+            <div className="card-title">
+              <SparklesIcon />
+              What May will do:
+            </div>
+            <div className="info-box-text" style={{ fontSize: '15px', lineHeight: '1.8' }}>
               • Rewrite bullets with strong action verbs and "did X by Y as shown by Z" framework
               <br />
               • Add or improve metrics to quantify your impact
@@ -266,35 +279,36 @@ function ResumeUpload({ onResumeComplete, onBack }) {
           </div>
         </>
       ) : (
-        <>
-          <div className="success-banner">
-            <span className="success-icon">✓</span>
-            <div className="success-text">
-              Resume rewritten successfully! {improvements}
+        <div className="stagger-1">
+          <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
+            <div className="card-title" style={{ color: '#065f46' }}>
+              <SparklesIcon />
+              Resume Rewritten!
             </div>
+            <p style={{ color: '#065f46', fontSize: '15px' }}>{improvements}</p>
           </div>
 
-          <div className="card-premium">
+          <div className="card-premium" style={{ background: 'white' }}>
             <div className="card-title">Preview</div>
             <div style={{
-              padding: 'var(--space-xl)',
-              background: 'var(--bg-secondary)',
-              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-lg)',
               maxHeight: '400px',
               overflow: 'auto',
               fontSize: '14px',
-              lineHeight: '1.6'
+              lineHeight: '1.6',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '16px'
             }}>
-              <h3>{rewrittenResume.name}</h3>
-              <p>{rewrittenResume.contact.email} | {rewrittenResume.contact.phone}</p>
-              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-default)' }} />
+              <h3 style={{ fontSize: '20px', fontWeight: '800' }}>{rewrittenResume.name}</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>{rewrittenResume.contact.email} | {rewrittenResume.contact.phone}</p>
+              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
 
               {rewrittenResume.experience?.map((exp, idx) => (
                 <div key={idx} style={{ marginBottom: '16px' }}>
-                  <strong>{exp.title}</strong> - {exp.company}
-                  <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                  <strong>{exp.title}</strong> — {exp.company}
+                  <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
                     {exp.bullets?.map((bullet, bidx) => (
-                      <li key={bidx}>{bullet}</li>
+                      <li key={bidx} style={{ marginBottom: '4px' }}>{bullet}</li>
                     ))}
                   </ul>
                 </div>
@@ -302,25 +316,19 @@ function ResumeUpload({ onResumeComplete, onBack }) {
             </div>
           </div>
 
-          <div className="info-box" style={{ marginBottom: 'var(--space-lg)' }}>
-            <div className="info-box-title">💡 Save this as your primary resume?</div>
-            <div className="info-box-text">
-              Click "Save as Primary Resume" to save this rewritten version. You'll then be able to tailor it for specific jobs or get it reviewed.
-            </div>
-          </div>
-
-          <div className="button-group">
+          <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
             <button className="btn btn-secondary" onClick={handleStartOver}>
-              Upload Another Resume
+              Upload Another
             </button>
             <button className="btn btn-secondary" onClick={handleDownload}>
+              <DownloadIcon />
               Download DOCX
             </button>
             <button className="btn btn-primary" onClick={handleSaveAsPrimary}>
               Save as Primary Resume
             </button>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
