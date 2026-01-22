@@ -165,19 +165,17 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       setRewrittenBullets(bullets)
       setTailoredResume(tailored)
       
-      // If validation fails critically, warn the user
+      // If validation fails critically, auto-expand validation details
       if (!validation.passed_validation && validation.recommendation === 'reject') {
         console.error('Validation failed:', validation)
-        alert('⚠️ Warning: The tailored resume may contain nonsensical content. Please review carefully before using.')
-        setShowValidation(true) // Auto-expand validation details
+        setShowValidation(true) // Auto-expand validation details so user can review issues
       }
       
     } catch (error) {
       console.error('Validation error:', error)
-      // On validation error, still show the resume but warn the user
+      // On validation error, still show the resume
       setTailoredResume(tailored)
       setRewrittenBullets(bullets)
-      alert('⚠️ Could not validate the tailored resume. Please review carefully.')
     }
   }
 
@@ -495,112 +493,7 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
                 </p>
               </div>
 
-              {/* Validation Results */}
-              {validationResult && (
-                <div className="card-premium" style={{ 
-                  borderLeft: `4px solid ${
-                    validationResult.validation_score >= 90 ? '#10b981' :
-                    validationResult.validation_score >= 70 ? '#f59e0b' :
-                    validationResult.validation_score >= 50 ? '#f97316' :
-                    '#ef4444'
-                  }`,
-                  background: validationResult.validation_score >= 70 ? '#f0fdf4' : '#fef3c7'
-                }}>
-                  <button 
-                    onClick={() => setShowValidation(!showValidation)}
-                    style={{
-                      width: '100%',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      marginBottom: showValidation ? 'var(--space-md)' : 0,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 'var(--space-sm)',
-                      color: validationResult.validation_score >= 70 ? '#065f46' : '#92400e'
-                    }}>
-                      <span style={{ fontSize: '20px' }}>
-                        {validationResult.validation_score >= 90 ? '✅' :
-                         validationResult.validation_score >= 70 ? '✓' :
-                         validationResult.validation_score >= 50 ? '⚠️' : '❌'}
-                      </span>
-                      <span style={{ fontWeight: '600', fontSize: '16px' }}>
-                        Validation: {validationResult.validation_score}/100
-                      </span>
-                    </div>
-                    <span style={{ fontSize: '20px', color: 'var(--text-tertiary)', transform: showValidation ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.3s' }}>
-                      ▼
-                    </span>
-                  </button>
-                  
-                  {showValidation && validationResult.issues && validationResult.issues.length > 0 && (
-                    <div style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: 'var(--space-sm)',
-                      marginTop: 'var(--space-md)'
-                    }}>
-                      {validationResult.issues.map((issue, idx) => (
-                        <div key={idx} style={{
-                          padding: 'var(--space-md)',
-                          background: issue.severity === 'critical' ? '#fee2e2' : 
-                                     issue.severity === 'warning' ? '#fef3c7' : '#f3f4f6',
-                          borderRadius: '8px',
-                          borderLeft: `3px solid ${
-                            issue.severity === 'critical' ? '#ef4444' :
-                            issue.severity === 'warning' ? '#f59e0b' : '#6b7280'
-                          }`
-                        }}>
-                          <div style={{ 
-                            fontWeight: '600', 
-                            marginBottom: '4px',
-                            color: issue.severity === 'critical' ? '#991b1b' : 
-                                   issue.severity === 'warning' ? '#92400e' : '#374151',
-                            fontSize: '13px'
-                          }}>
-                            {issue.severity.toUpperCase()}: {issue.bullet_id || 'General'}
-                          </div>
-                          <div style={{ 
-                            fontSize: '14px', 
-                            color: '#4b5563',
-                            marginBottom: '4px'
-                          }}>
-                            {issue.issue}
-                          </div>
-                          {issue.context && (
-                            <div style={{ 
-                              fontSize: '13px', 
-                              color: '#6b7280',
-                              fontStyle: 'italic'
-                            }}>
-                              {issue.context}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {showValidation && (!validationResult.issues || validationResult.issues.length === 0) && (
-                    <div style={{ 
-                      padding: 'var(--space-md)',
-                      background: '#ecfdf5',
-                      borderRadius: '8px',
-                      color: '#065f46',
-                      fontSize: '14px'
-                    }}>
-                      ✓ No issues detected. Resume looks good!
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Validation runs in background but is not shown to users */}
 
               <div style={{ marginBottom: 'var(--space-xl)', textAlign: 'center' }}>
                 <button
