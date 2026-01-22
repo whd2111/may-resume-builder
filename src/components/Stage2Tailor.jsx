@@ -86,7 +86,11 @@ Please tailor this resume for the job description.`
 
   const handleDownload = async () => {
     try {
-      await generateDOCX(tailoredResume, 'tailored_resume.docx')
+      // Extract company name from job description (look for common patterns)
+      const companyMatch = jobDescription.match(/(?:at|for|with|@)\s+([A-Z][A-Za-z\s&]+?)(?:\s+is|\s+seeks|\s+looking|\.|,|$)/i)
+      const companyName = companyMatch ? companyMatch[1].trim() : 'TAILORED'
+      
+      await generateDOCX(tailoredResume, null, companyName)
       alert('Resume downloaded successfully!')
     } catch (error) {
       alert(`Error generating document: ${error.message}`)

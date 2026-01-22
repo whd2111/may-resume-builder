@@ -11,13 +11,21 @@ import {
 } from 'docx'
 import { saveAs } from 'file-saver'
 
-export async function generateDOCX(resumeData, filename = null) {
+export async function generateDOCX(resumeData, filename = null, companyName = null) {
   // Auto-generate filename if not provided
   if (!filename) {
     const nameParts = resumeData.name.trim().split(' ')
     const lastName = nameParts[nameParts.length - 1].toUpperCase()
     const firstName = nameParts[0].toUpperCase()
-    filename = `${lastName}_${firstName}_RESUME_MAIN.docx`
+    
+    if (companyName) {
+      // For tailored resumes: LASTNAME_FIRSTNAME_COMPANY.docx
+      const cleanCompany = companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')
+      filename = `${lastName}_${firstName}_${cleanCompany}.docx`
+    } else {
+      // For master resumes
+      filename = `${lastName}_${firstName}_RESUME.docx`
+    }
   }
   // Create the document with US Letter page size
   const doc = new Document({
@@ -60,10 +68,10 @@ export async function generateDOCX(resumeData, filename = null) {
               height: 15840 // US Letter height in DXA
             },
             margin: {
-              top: 720,    // 0.5 inch
-              right: 720,
-              bottom: 720,
-              left: 720
+              top: 576,    // 0.4 inch (tighter margins)
+              right: 576,
+              bottom: 576,
+              left: 576
             }
           }
         },
@@ -75,10 +83,10 @@ export async function generateDOCX(resumeData, filename = null) {
               new TextRun({
                 text: resumeData.name.toUpperCase(),
                 bold: true,
-                size: 28 // 14pt - bigger for name
+                size: 26 // 13pt - slightly smaller
               })
             ],
-            spacing: { after: 80 }
+            spacing: { after: 60 }
           }),
 
           // Contact info
@@ -90,7 +98,7 @@ export async function generateDOCX(resumeData, filename = null) {
                 size: 20 // 10pt
               })
             ],
-            spacing: { after: 240 }
+            spacing: { after: 180 }
           }),
 
           // Education Section Header
@@ -102,7 +110,7 @@ export async function generateDOCX(resumeData, filename = null) {
                 size: 22
               })
             ],
-            spacing: { after: 120 },
+            spacing: { after: 80 },
             border: {
               bottom: {
                 color: '000000',
@@ -125,7 +133,7 @@ export async function generateDOCX(resumeData, filename = null) {
                 size: 22
               })
             ],
-            spacing: { before: 240, after: 120 },
+            spacing: { before: 180, after: 100 },
             border: {
               bottom: {
                 color: '000000',
@@ -181,7 +189,7 @@ function generateEducationSection(education) {
             position: TabStopPosition.MAX
           }
         ],
-        spacing: { before: 160, after: 80 }
+        spacing: { before: 120, after: 60 }
       })
     )
 
@@ -208,7 +216,7 @@ function generateEducationSection(education) {
             position: TabStopPosition.MAX
           }
         ],
-        spacing: { after: edu.details ? 80 : 160 }
+        spacing: { after: edu.details ? 60 : 120 }
       })
     )
 
@@ -262,7 +270,7 @@ function generateExperienceSection(experience) {
             position: TabStopPosition.MAX
           }
         ],
-        spacing: { before: 160, after: 80 }
+        spacing: { before: 120, after: 60 }
       })
     )
 
@@ -309,7 +317,7 @@ function generateExperienceSection(experience) {
                 size: 22
               })
             ],
-            spacing: { after: 100 }
+            spacing: { after: 80 }
           })
         )
       })
