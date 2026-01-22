@@ -1,13 +1,71 @@
+import { useState } from 'react'
 import '../App.css'
 import { SparklesIcon, TargetIcon, SearchIcon } from '../utils/icons'
+import { useAuth } from '../contexts/AuthContext'
+import AuthModal from './auth/AuthModal'
 
-function Home({ onNavigate }) {
+function Home({ onNavigate, user, hasMasterResume }) {
+  const { signOut } = useAuth()
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      setShowUserMenu(false)
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
     <div className="home-container">
       <div className="home-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: '900px', marginBottom: 'var(--space-lg)' }}>
+          <div style={{ flex: 1 }} />
+          
+          {user ? (
+            <div className="user-menu">
+              <button 
+                className="user-button" 
+                onClick={() => setShowUserMenu(!showUserMenu)}
+              >
+                <span className="user-avatar">
+                  {user.email?.[0]?.toUpperCase() || 'U'}
+                </span>
+                <span>{user.email?.split('@')[0]}</span>
+              </button>
+              
+              {showUserMenu && (
+                <div className="user-dropdown">
+                  <button onClick={() => { onNavigate('library'); setShowUserMenu(false); }}>
+                    My Resumes
+                  </button>
+                  <button onClick={handleSignOut}>Sign Out</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setShowAuthModal(true)}
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+
         <h1 className="logo">May</h1>
         <p className="tagline">Your AI-powered resume builder</p>
+        
+        {user && hasMasterResume && (
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '14px', marginTop: 'var(--space-sm)' }}>
+            ✓ Master resume saved
+          </p>
+        )}
       </div>
+
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
 
       <div className="action-cards">
         <div className="action-card stagger-1" onClick={() => onNavigate('build')}>
