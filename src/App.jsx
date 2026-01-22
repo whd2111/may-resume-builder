@@ -9,11 +9,12 @@ import ResumeReviewer from './components/ResumeReviewer'
 import ResumeLibrary from './components/ResumeLibrary'
 import Dashboard from './components/Dashboard'
 import ResumeBankUpload from './components/ResumeBankUpload'
+import PatternExtractor from './components/PatternExtractor'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
-  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank'
+  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns'
 
   // Show loading state while auth is initializing
   if (authLoading) {
@@ -104,6 +105,12 @@ function App() {
 
       {page === 'resumebank' && (
         <ResumeBankUpload
+          onBack={handleBack}
+        />
+      )}
+
+      {page === 'patterns' && (
+        <PatternExtractor
           onBack={handleBack}
         />
       )}

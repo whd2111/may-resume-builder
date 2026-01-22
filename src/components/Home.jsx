@@ -24,13 +24,21 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
   const handlePasswordSubmit = (e) => {
     e.preventDefault()
     if (password === 'resume') {
-      onNavigate('resumebank')
+      // Show admin menu instead of going directly to resume bank
       setShowPasswordPrompt(false)
+      setShowAdminMenu(true)
       setPassword('')
       setPasswordError(false)
     } else {
       setPasswordError(true)
     }
+  }
+
+  const [showAdminMenu, setShowAdminMenu] = useState(false)
+
+  const handleAdminAction = (action) => {
+    setShowAdminMenu(false)
+    onNavigate(action)
   }
 
   return (
@@ -222,6 +230,58 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Menu Modal */}
+      {showAdminMenu && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setShowAdminMenu(false)}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: 'var(--space-2xl)',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '20px', marginBottom: 'var(--space-lg)' }}>
+              Admin Tools
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleAdminAction('resumebank')}
+                style={{ width: '100%', justifyContent: 'flex-start' }}
+              >
+                📤 Upload Resumes to Bank
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleAdminAction('patterns')}
+                style={{ width: '100%', justifyContent: 'flex-start' }}
+              >
+                🔍 Extract Patterns
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowAdminMenu(false)}
+                style={{ width: '100%', marginTop: 'var(--space-md)' }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
