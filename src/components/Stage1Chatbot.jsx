@@ -335,7 +335,7 @@ function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
           <p className="page-subtitle">Your resume has been downloaded. Here's May's feedback:</p>
         </div>
 
-        <div className="card">
+        <div className="card-premium">
           <div className="card-title">AI Review Feedback</div>
           <div style={{
             whiteSpace: 'pre-wrap',

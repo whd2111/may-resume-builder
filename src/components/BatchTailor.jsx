@@ -257,7 +257,7 @@ function BatchTailor({ masterResume, onBack }) {
       )}
 
       {!isTailoring && results.length > 0 && (
-        <div className="card">
+        <div className="card-premium">
           <div className="card-title">Batch Tailoring Complete!</div>
 
           <div style={{ marginBottom: 'var(--space-lg)' }}>

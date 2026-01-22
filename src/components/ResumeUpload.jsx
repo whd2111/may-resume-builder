@@ -274,7 +274,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
             </div>
           </div>
 
-          <div className="card">
+          <div className="card-premium">
             <div className="card-title">Preview</div>
             <div style={{
               padding: 'var(--space-xl)',

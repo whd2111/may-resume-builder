@@ -198,7 +198,7 @@ function ResumeReviewer({ masterResume, onBack }) {
       )}
 
       {review && (
-        <div className="card">
+        <div className="card-premium">
           <div className="card-title">Resume Review</div>
           <div style={{
             whiteSpace: 'pre-wrap',

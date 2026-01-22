@@ -197,7 +197,7 @@ function MetricPrompter({ resumeData, onComplete, onSkip }) {
         </p>
       </div>
 
-      <div className="card">
+      <div className="card-premium">
         <div className="info-box" style={{ marginBottom: 'var(--space-lg)', borderColor: '#3b82f6', background: '#eff6ff' }}>
           <div className="info-box-title" style={{ color: '#1e40af' }}>
             💼 {currentMetric.title} at {currentMetric.company}
