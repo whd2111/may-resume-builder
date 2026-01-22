@@ -42,7 +42,7 @@ STRICT RULES:
      b) Fluff phrases ("responsible for", "worked on", "assisted with")
      c) Less critical scope modifiers
    - If uncertain about bullet length, default to the SHORTER, punchier version
-10. **CHRONOLOGICAL ORDER**: Resume bullet points should be in chronological order (most recent first) within each position
+10. **CHRONOLOGICAL ORDER**: When rewriting bullets, maintain their original sequence within each position. Do NOT reorder bullets - the original resume already has the preferred order (typically most recent/impactful accomplishments first)
 
 OUTPUT FORMAT:
 Return ONLY valid JSON with no markdown, no code blocks, no extra text:

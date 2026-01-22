@@ -110,9 +110,16 @@ Coverage Report:
 
 IMPORTANT: Each bullet includes original_company, original_title, and original_dates.
 Make sure your rewrites make sense for that specific company and role context.
-Do NOT add activities that don't match the company type (e.g., don't add "martial arts" to marketing agencies).
 
-Rewrite these bullets to emphasize the must-haves and primary keywords. Return JSON only.`
+CRITICAL RULES FOR REWRITING:
+1. Do NOT add activities that don't match the company type (e.g., don't add "martial arts" to Ogilvy & Mather, don't add "surgery" to PwC)
+2. If a bullet is from an IRRELEVANT company/role (e.g., marketing agency when applying for martial arts instructor), DO NOT force-fit job keywords
+3. Instead, emphasize TRANSFERABLE skills that make sense for that company (e.g., leadership, communication, data analysis, project management)
+4. NEVER invent activities that didn't happen at that company - be truthful above all else
+5. If the selected bullets don't perfectly cover all job requirements, that's OK - gaps are better than hallucinations
+6. Maintain CHRONOLOGICAL ORDER - keep bullets in their original sequence within each experience (most recent accomplishments first)
+
+Rewrite these bullets to emphasize the must-haves and primary keywords while following the rules above. Return JSON only.`
 
       const response = await callClaude(
         null, 
@@ -191,6 +198,11 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
         }
       }
     })
+
+    // Ensure bullets are in chronological order (most recent first) within each experience
+    // Note: This assumes bullets in the original resume are already chronologically ordered
+    // If they're not, this preserves the original order
+    // The chronological order rule in the prompt ensures NEW bullets are written chronologically
 
     return tailored
   }

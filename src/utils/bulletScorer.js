@@ -117,7 +117,7 @@ function countFluffPhrases(text) {
 
 /**
  * Score a single bullet against the checklist
- * @param {Object} bullet - Bullet object with original_text
+ * @param {Object} bullet - Bullet object with original_text, company, title
  * @param {Object} checklist - Job checklist JSON
  * @returns {Object} - Score details
  */
@@ -127,6 +127,43 @@ function scoreBullet(bullet, checklist) {
   const reasons = []
 
   const bulletText = bullet.original_text
+  
+  // NEW: Check for company/role relevance boost
+  // If the job is for "Tae Kwon Do Instructor" and the bullet is from a martial arts role,
+  // boost the score even if keywords don't perfectly match
+  const jobTitle = (checklist.job_metadata?.job_title || '').toLowerCase()
+  const jobCompany = (checklist.job_metadata?.company_name || '').toLowerCase()
+  const bulletCompany = (bullet.company || '').toLowerCase()
+  const bulletTitle = (bullet.title || '').toLowerCase()
+  
+  // Industry/domain relevance keywords
+  const relevancePatterns = [
+    { job: ['martial arts', 'tae kwon do', 'taekwondo', 'karate', 'judo', 'instructor', 'sensei', 'dojo'], 
+      resume: ['martial arts', 'tae kwon do', 'taekwondo', 'karate', 'judo', 'instructor', 'teaching', 'coach', 'dojo', 'city of raleigh'] },
+    { job: ['software', 'engineer', 'developer', 'programming', 'tech'],
+      resume: ['software', 'engineer', 'developer', 'tech', 'programming', 'code'] },
+    { job: ['marketing', 'growth', 'advertising', 'brand'],
+      resume: ['marketing', 'growth', 'advertising', 'brand', 'campaign'] },
+    { job: ['finance', 'investment', 'banking', 'trading'],
+      resume: ['finance', 'investment', 'banking', 'trading', 'analyst'] }
+  ]
+  
+  for (const pattern of relevancePatterns) {
+    const jobMatches = pattern.job.some(keyword => 
+      jobTitle.includes(keyword) || jobCompany.includes(keyword)
+    )
+    const resumeMatches = pattern.resume.some(keyword =>
+      bulletCompany.includes(keyword) || bulletTitle.includes(keyword)
+    )
+    
+    if (jobMatches && resumeMatches) {
+      score += 10 // Strong relevance boost
+      matchedTerms.push('industry relevance')
+      reasons.push(`${bullet.company} / ${bullet.title} is highly relevant to this role`)
+      break
+    }
+  }
+
 
   // Check must_haves tools (+5 each)
   const mustHaveTools = checklist.must_haves.tools || []
