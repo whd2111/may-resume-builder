@@ -2,13 +2,12 @@ import { useState } from 'react'
 import Stage2Tailor from './Stage2Tailor'
 import BatchTailor from './BatchTailor'
 
-function TailorJobs({ apiKey, masterResume, onBack }) {
+function TailorJobs({ masterResume, onBack }) {
   const [mode, setMode] = useState(null) // null, 'single', 'batch'
 
   if (mode === 'single') {
     return (
       <Stage2Tailor
-        apiKey={apiKey}
         masterResume={masterResume}
         onBack={() => setMode(null)}
       />
@@ -18,7 +17,6 @@ function TailorJobs({ apiKey, masterResume, onBack }) {
   if (mode === 'batch') {
     return (
       <BatchTailor
-        apiKey={apiKey}
         masterResume={masterResume}
         onBack={() => setMode(null)}
       />

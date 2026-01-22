@@ -1,18 +1,15 @@
 export async function callClaude(apiKey, messages, systemPrompt) {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call our serverless function instead of Anthropic directly
+    // This keeps the API key server-side and secure
+    const response = await fetch('/api/claude', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: messages
+        messages: messages,
+        systemPrompt: systemPrompt
       })
     });
 

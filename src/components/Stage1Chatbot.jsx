@@ -132,7 +132,7 @@ function formatResumeForReview(resume) {
   return text
 }
 
-function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
+function Stage1Chatbot({ onResumeComplete, onBack, existingResume }) {
   const getInitialMessage = () => {
     if (existingResume) {
       return "Welcome back! I can help you refine your existing resume or we can start fresh. What would you like to do?"
@@ -177,7 +177,7 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
         content: msg.content
       }))
 
-      const response = await callClaude(apiKey, conversationHistory, SYSTEM_PROMPT)
+      const response = await callClaude(null, conversationHistory, SYSTEM_PROMPT)
 
       // Check if Claude wants to generate the resume
       if (response.includes('"action": "generate_resume"')) {
@@ -205,7 +205,7 @@ function Stage1Chatbot({ apiKey, onResumeComplete, onBack, existingResume }) {
             // Get AI review
             const reviewPrompt = formatResumeForReview(resumeData.data)
             const reviewResponse = await callClaude(
-              apiKey,
+              null,
               [{ role: 'user', content: `Please review this resume and provide detailed feedback:\n\n${reviewPrompt}` }],
               REVIEWER_SYSTEM_PROMPT
             )

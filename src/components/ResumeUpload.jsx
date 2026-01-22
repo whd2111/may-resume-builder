@@ -58,7 +58,7 @@ Respond with a JSON object in this EXACT format:
   "improvements": "Brief summary of the main improvements made"
 }`;
 
-function ResumeUpload({ apiKey, onBack }) {
+function ResumeUpload({ onBack }) {
   const [file, setFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
@@ -112,7 +112,7 @@ function ResumeUpload({ apiKey, onBack }) {
 
       // Send to Claude for rewriting
       const prompt = `Here is the resume to rewrite:\n\n${resumeText}\n\nPlease rewrite this resume following best practices.`
-      const response = await callClaude(apiKey, [{ role: 'user', content: prompt }], REWRITE_PROMPT)
+      const response = await callClaude(null, [{ role: 'user', content: prompt }], REWRITE_PROMPT)
 
       // Parse response
       const jsonMatch = response.match(/\{[\s\S]*"action":\s*"rewritten_resume"[\s\S]*\}/)

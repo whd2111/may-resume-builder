@@ -39,7 +39,7 @@ Respond with a JSON object in this EXACT format:
   "explanation": "Brief explanation of key changes made to tailor this resume"
 }`;
 
-function Stage2Tailor({ apiKey, masterResume, onBack }) {
+function Stage2Tailor({ masterResume, onBack }) {
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [tailoredResume, setTailoredResume] = useState(null)
@@ -63,7 +63,7 @@ ${jobDescription}
 
 Please tailor this resume for the job description.`
 
-      const response = await callClaude(apiKey, [{ role: 'user', content: prompt }], TAILORING_PROMPT)
+      const response = await callClaude(null, [{ role: 'user', content: prompt }], TAILORING_PROMPT)
 
       // Parse the response
       const jsonMatch = response.match(/\{[\s\S]*"action":\s*"tailored_resume"[\s\S]*\}/)

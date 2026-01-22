@@ -29,7 +29,7 @@ Output the tailored resume as a valid JSON object with this structure:
   "additional": "..."
 }`;
 
-function BatchTailor({ apiKey, masterResume, onBack }) {
+function BatchTailor({ masterResume, onBack }) {
   const [jobDescriptions, setJobDescriptions] = useState('')
   const [isTailoring, setIsTailoring] = useState(false)
   const [results, setResults] = useState([])
@@ -74,7 +74,7 @@ function BatchTailor({ apiKey, masterResume, onBack }) {
           const prompt = `Here is the primary 1-page resume:\n\n${JSON.stringify(masterResume, null, 2)}\n\nHere is the job description:\n\n${jobDesc}\n\nPlease tailor this resume for this specific job. Return ONLY the tailored resume as a valid JSON object with no additional text.`
 
           const response = await callClaude(
-            apiKey,
+            null,
             [{ role: 'user', content: prompt }],
             BATCH_TAILOR_SYSTEM_PROMPT
           )

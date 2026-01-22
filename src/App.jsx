@@ -6,9 +6,8 @@ import TailorJobs from './components/TailorJobs'
 import ResumeReviewer from './components/ResumeReviewer'
 
 function App() {
-  // Get API key from environment variable
-  const apiKey = import.meta.env.VITE_ANTHROPIC
-
+  // API key is now handled server-side via Vercel serverless function
+  // No need to pass it from client anymore
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review'
   const [masterResume, setMasterResume] = useState(null)
 
@@ -48,7 +47,6 @@ function App() {
 
       {page === 'build' && (
         <BuildResume
-          apiKey={apiKey}
           onResumeComplete={handleResumeComplete}
           onBack={handleBack}
           existingResume={masterResume}
@@ -57,7 +55,6 @@ function App() {
 
       {page === 'tailor' && (
         <TailorJobs
-          apiKey={apiKey}
           masterResume={masterResume}
           onBack={handleBack}
         />
@@ -65,7 +62,6 @@ function App() {
 
       {page === 'review' && (
         <ResumeReviewer
-          apiKey={apiKey}
           masterResume={masterResume}
           onBack={handleBack}
         />

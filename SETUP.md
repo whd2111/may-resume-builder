@@ -65,8 +65,9 @@ You'll be prompted to add the environment variable during setup.
 
 - **Never commit `.env`** - it's in `.gitignore` for security
 - **Never share API keys** in chat/public repos - they get auto-revoked
-- Each team member should use their own API key
+- Each team member should use their own API key for local development
 - The `.env.example` file is a template - copy it but don't put real keys in it
+- **API key security:** The app uses Vercel serverless functions (`/api/claude.js`) to keep the API key server-side and prevent exposure in browser network requests
 
 ## Troubleshooting
 

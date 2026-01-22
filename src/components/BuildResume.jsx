@@ -2,13 +2,12 @@ import { useState } from 'react'
 import Stage1Chatbot from './Stage1Chatbot'
 import ResumeUpload from './ResumeUpload'
 
-function BuildResume({ apiKey, onResumeComplete, onBack, existingResume }) {
+function BuildResume({ onResumeComplete, onBack, existingResume }) {
   const [mode, setMode] = useState(null) // null, 'chat', 'upload'
 
   if (mode === 'chat') {
     return (
       <Stage1Chatbot
-        apiKey={apiKey}
         onResumeComplete={onResumeComplete}
         onBack={() => setMode(null)}
         existingResume={existingResume}
@@ -19,7 +18,6 @@ function BuildResume({ apiKey, onResumeComplete, onBack, existingResume }) {
   if (mode === 'upload') {
     return (
       <ResumeUpload
-        apiKey={apiKey}
         onBack={() => setMode(null)}
       />
     )

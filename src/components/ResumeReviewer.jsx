@@ -44,7 +44,7 @@ Provide your review in this structure:
 
 Be direct, specific, and provide examples of how to improve weak bullets.`;
 
-function ResumeReviewer({ apiKey, masterResume, onBack }) {
+function ResumeReviewer({ masterResume, onBack }) {
   const [review, setReview] = useState(null)
   const [isReviewing, setIsReviewing] = useState(false)
   const [error, setError] = useState('')
@@ -63,7 +63,7 @@ function ResumeReviewer({ apiKey, masterResume, onBack }) {
       const resumeText = formatResumeForReview(masterResume)
 
       const response = await callClaude(
-        apiKey,
+        null,
         [{ role: 'user', content: `Please review this resume and provide detailed feedback:\n\n${resumeText}` }],
         REVIEWER_SYSTEM_PROMPT
       )
