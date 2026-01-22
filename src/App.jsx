@@ -8,11 +8,12 @@ import TailorJobs from './components/TailorJobs'
 import ResumeReviewer from './components/ResumeReviewer'
 import ResumeLibrary from './components/ResumeLibrary'
 import Dashboard from './components/Dashboard'
+import ResumeBankUpload from './components/ResumeBankUpload'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
-  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard'
+  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank'
 
   // Show loading state while auth is initializing
   if (authLoading) {
@@ -97,6 +98,12 @@ function App() {
 
       {page === 'dashboard' && (
         <Dashboard
+          onBack={handleBack}
+        />
+      )}
+
+      {page === 'resumebank' && (
+        <ResumeBankUpload
           onBack={handleBack}
         />
       )}

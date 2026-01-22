@@ -8,6 +8,9 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
   const { signOut } = useAuth()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
+  const [password, setPassword] = useState('')
+  const [passwordError, setPasswordError] = useState(false)
 
   const handleSignOut = async () => {
     try {
@@ -15,6 +18,18 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
       setShowUserMenu(false)
     } catch (error) {
       console.error('Error signing out:', error)
+    }
+  }
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault()
+    if (password === 'resume') {
+      onNavigate('resumebank')
+      setShowPasswordPrompt(false)
+      setPassword('')
+      setPasswordError(false)
+    } else {
+      setPasswordError(true)
     }
   }
 
@@ -98,6 +113,118 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
           </p>
         </div>
       </div>
+
+      {/* Resume Bank Access Button */}
+      <div style={{
+        marginTop: 'var(--space-3xl)',
+        paddingTop: 'var(--space-xl)',
+        borderTop: '1px solid var(--border-subtle)',
+        textAlign: 'center',
+        maxWidth: '900px',
+        margin: 'var(--space-3xl) auto 0'
+      }}>
+        <button
+          onClick={() => setShowPasswordPrompt(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-tertiary)',
+            fontSize: '13px',
+            cursor: 'pointer',
+            padding: 'var(--space-sm)',
+            opacity: 0.5,
+            transition: 'opacity 0.2s ease'
+          }}
+          onMouseEnter={(e) => e.target.style.opacity = '1'}
+          onMouseLeave={(e) => e.target.style.opacity = '0.5'}
+        >
+          Resume Bank
+        </button>
+      </div>
+
+      {/* Password Prompt Modal */}
+      {showPasswordPrompt && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => {
+          setShowPasswordPrompt(false)
+          setPassword('')
+          setPasswordError(false)
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '24px',
+            padding: 'var(--space-2xl)',
+            maxWidth: '400px',
+            width: '90%',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: '20px', marginBottom: 'var(--space-md)' }}>
+              Resume Bank Access
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: 'var(--space-lg)' }}>
+              Enter password to access the resume bank upload system.
+            </p>
+            <form onSubmit={handlePasswordSubmit}>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setPasswordError(false)
+                }}
+                placeholder="Enter password"
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: 'var(--space-md)',
+                  border: `2px solid ${passwordError ? '#ef4444' : 'var(--border-subtle)'}`,
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  marginBottom: 'var(--space-md)',
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease'
+                }}
+              />
+              {passwordError && (
+                <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: 'var(--space-md)' }}>
+                  Incorrect password
+                </p>
+              )}
+              <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowPasswordPrompt(false)
+                    setPassword('')
+                    setPasswordError(false)
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  Access
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
