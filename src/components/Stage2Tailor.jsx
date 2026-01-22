@@ -6,17 +6,23 @@ import { extractJobChecklist } from '../utils/checklistExtractor'
 import { scoreAndSelectBullets } from '../utils/bulletScorer'
 import { CHECKLIST_TAILORING_PROMPT } from '../utils/tailoringPrompts'
 import { useApplications } from '../hooks/useApplications'
+import { validateTailoredResume, quickValidate } from '../utils/tailoredResumeValidator'
 
 function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const { createApplication } = useApplications()
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [loadingStage, setLoadingStage] = useState('') // 'checklist', 'scoring', 'tailoring'
+  const [loadingStage, setLoadingStage] = useState('') // 'checklist', 'scoring', 'tailoring', 'validating'
   
   // New checklist-based flow
   const [checklist, setChecklist] = useState(null)
   const [selection, setSelection] = useState(null)
   const [tailoredResume, setTailoredResume] = useState(null)
+  const [rewrittenBullets, setRewrittenBullets] = useState(null)
+  
+  // Validation state
+  const [validationResult, setValidationResult] = useState(null)
+  const [showValidation, setShowValidation] = useState(false)
   
   // UI state
   const [showChecklist, setShowChecklist] = useState(false)
@@ -34,8 +40,18 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
     setChecklist(null)
     setSelection(null)
     setTailoredResume(null)
+    setValidationResult(null)
+    setRewrittenBullets(null)
+    setShowValidation(false)
 
     try {
+      // Debug: Log the resume being used for tailoring
+      console.log('Using primary resume for tailoring:', {
+        name: primaryResume?.name,
+        experienceCount: primaryResume?.experience?.length,
+        firstCompany: primaryResume?.experience?.[0]?.company,
+        bulletCount: primaryResume?.experience?.reduce((acc, exp) => acc + (exp.bullets?.length || 0), 0)
+      })
       // Step 1: Extract job checklist
       setLoadingStage('checklist')
       const extractedChecklist = await extractJobChecklist(jobDescription)
@@ -48,7 +64,11 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
 
       // Step 3: Tailor the selected bullets
       setLoadingStage('tailoring')
-      await handleTailorSelectedBullets(extractedChecklist, selectionResult)
+      const { tailored, bullets } = await handleTailorSelectedBullets(extractedChecklist, selectionResult)
+
+      // Step 4: Validate the tailored resume
+      setLoadingStage('validating')
+      await handleValidation(tailored, extractedChecklist, bullets)
 
     } catch (error) {
       console.error('Pipeline error:', error)
@@ -61,16 +81,36 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
 
   const handleTailorSelectedBullets = async (checklistData, selectionData) => {
     try {
-      // Prepare the prompt with checklist and selected bullets
+      // Prepare the prompt with checklist and selected bullets, including original context
+      const bulletsWithContext = selectionData.selected_bullets.map(bullet => {
+        // Find the original experience context
+        const match = bullet.bullet_id.match(/exp(\d+)_bullet(\d+)/)
+        if (match) {
+          const expIndex = parseInt(match[1], 10)
+          const exp = primaryResume?.experience?.[expIndex]
+          return {
+            ...bullet,
+            original_company: exp?.company,
+            original_title: exp?.title,
+            original_dates: exp?.dates,
+          }
+        }
+        return bullet
+      })
+      
       const prompt = `Job Checklist:
 ${JSON.stringify(checklistData, null, 2)}
 
-Selected Bullets to Rewrite (in priority order):
-${JSON.stringify(selectionData.selected_bullets, null, 2)}
+Selected Bullets to Rewrite (in priority order with original context):
+${JSON.stringify(bulletsWithContext, null, 2)}
 
 Coverage Report:
 - Covered must-haves: ${selectionData.coverage_report.covered_must_haves.join(', ')}
 - Missing must-haves: ${selectionData.coverage_report.missing_must_haves.join(', ')}
+
+IMPORTANT: Each bullet includes original_company, original_title, and original_dates.
+Make sure your rewrites make sense for that specific company and role context.
+Do NOT add activities that don't match the company type (e.g., don't add "martial arts" to marketing agencies).
 
 Rewrite these bullets to emphasize the must-haves and primary keywords. Return JSON only.`
 
@@ -90,11 +130,47 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
       
       // Apply the rewritten bullets to create tailored resume
       const tailored = applyRewrittenBullets(primaryResume, result.rewritten_bullets)
-      setTailoredResume(tailored)
+      
+      // Return both the tailored resume and the rewritten bullets for validation
+      return {
+        tailored,
+        bullets: result.rewritten_bullets
+      }
 
     } catch (error) {
       console.error('Tailoring error:', error)
       throw new Error(`Failed to tailor bullets: ${error.message}`)
+    }
+  }
+
+  const handleValidation = async (tailored, checklistData, bullets) => {
+    try {
+      // Quick client-side validation first
+      const quickCheck = quickValidate(tailored, checklistData, bullets)
+      
+      if (quickCheck.has_critical_issues) {
+        console.warn('Quick validation found critical issues:', quickCheck.issues)
+      }
+      
+      // Run full LLM validation
+      const validation = await validateTailoredResume(tailored, checklistData, bullets)
+      setValidationResult(validation)
+      setRewrittenBullets(bullets)
+      setTailoredResume(tailored)
+      
+      // If validation fails critically, warn the user
+      if (!validation.passed_validation && validation.recommendation === 'reject') {
+        console.error('Validation failed:', validation)
+        alert('⚠️ Warning: The tailored resume may contain nonsensical content. Please review carefully before using.')
+        setShowValidation(true) // Auto-expand validation details
+      }
+      
+    } catch (error) {
+      console.error('Validation error:', error)
+      // On validation error, still show the resume but warn the user
+      setTailoredResume(tailored)
+      setRewrittenBullets(bullets)
+      alert('⚠️ Could not validate the tailored resume. Please review carefully.')
     }
   }
 
@@ -123,6 +199,8 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
     setChecklist(null)
     setSelection(null)
     setTailoredResume(null)
+    setValidationResult(null)
+    setRewrittenBullets(null)
   }
 
   const handleStartOver = () => {
@@ -130,6 +208,8 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
     setChecklist(null)
     setSelection(null)
     setTailoredResume(null)
+    setValidationResult(null)
+    setRewrittenBullets(null)
     setIsSaved(false)
   }
 
@@ -190,6 +270,12 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
             ? "Paste a job description and May will customize your resume to match the requirements"
             : "You need to build a primary 1-page resume first before tailoring"}
         </p>
+        {primaryResume && (
+          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>
+            Using resume for: {primaryResume.name || 'Unknown'}
+            {primaryResume.experience && ` • ${primaryResume.experience.length} experience entries`}
+          </p>
+        )}
       </div>
 
       {!primaryResume && (
@@ -271,11 +357,13 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
                 {loadingStage === 'checklist' && <TargetIcon />}
                 {loadingStage === 'scoring' && <TargetIcon />}
                 {loadingStage === 'tailoring' && <WritingIcon />}
+                {loadingStage === 'validating' && <CheckIcon />}
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: '20px', fontWeight: '500' }}>
                 {loadingStage === 'checklist' && 'Extracting job requirements...'}
                 {loadingStage === 'scoring' && 'Scoring and selecting bullets...'}
                 {loadingStage === 'tailoring' && 'Tailoring selected bullets...'}
+                {loadingStage === 'validating' && 'Validating tailored content...'}
               </p>
               <div className="loading" style={{ marginTop: 'var(--space-lg)' }}></div>
             </div>
@@ -394,6 +482,113 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
                   Tailored {selection?.selected_bullets.length || 0} bullets to emphasize job requirements
                 </p>
               </div>
+
+              {/* Validation Results */}
+              {validationResult && (
+                <div className="card-premium" style={{ 
+                  borderLeft: `4px solid ${
+                    validationResult.validation_score >= 90 ? '#10b981' :
+                    validationResult.validation_score >= 70 ? '#f59e0b' :
+                    validationResult.validation_score >= 50 ? '#f97316' :
+                    '#ef4444'
+                  }`,
+                  background: validationResult.validation_score >= 70 ? '#f0fdf4' : '#fef3c7'
+                }}>
+                  <button 
+                    onClick={() => setShowValidation(!showValidation)}
+                    style={{
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      marginBottom: showValidation ? 'var(--space-md)' : 0,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 'var(--space-sm)',
+                      color: validationResult.validation_score >= 70 ? '#065f46' : '#92400e'
+                    }}>
+                      <span style={{ fontSize: '20px' }}>
+                        {validationResult.validation_score >= 90 ? '✅' :
+                         validationResult.validation_score >= 70 ? '✓' :
+                         validationResult.validation_score >= 50 ? '⚠️' : '❌'}
+                      </span>
+                      <span style={{ fontWeight: '600', fontSize: '16px' }}>
+                        Validation: {validationResult.validation_score}/100
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '20px', color: 'var(--text-tertiary)', transform: showValidation ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.3s' }}>
+                      ▼
+                    </span>
+                  </button>
+                  
+                  {showValidation && validationResult.issues && validationResult.issues.length > 0 && (
+                    <div style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: 'var(--space-sm)',
+                      marginTop: 'var(--space-md)'
+                    }}>
+                      {validationResult.issues.map((issue, idx) => (
+                        <div key={idx} style={{
+                          padding: 'var(--space-md)',
+                          background: issue.severity === 'critical' ? '#fee2e2' : 
+                                     issue.severity === 'warning' ? '#fef3c7' : '#f3f4f6',
+                          borderRadius: '8px',
+                          borderLeft: `3px solid ${
+                            issue.severity === 'critical' ? '#ef4444' :
+                            issue.severity === 'warning' ? '#f59e0b' : '#6b7280'
+                          }`
+                        }}>
+                          <div style={{ 
+                            fontWeight: '600', 
+                            marginBottom: '4px',
+                            color: issue.severity === 'critical' ? '#991b1b' : 
+                                   issue.severity === 'warning' ? '#92400e' : '#374151',
+                            fontSize: '13px'
+                          }}>
+                            {issue.severity.toUpperCase()}: {issue.bullet_id || 'General'}
+                          </div>
+                          <div style={{ 
+                            fontSize: '14px', 
+                            color: '#4b5563',
+                            marginBottom: '4px'
+                          }}>
+                            {issue.issue}
+                          </div>
+                          {issue.context && (
+                            <div style={{ 
+                              fontSize: '13px', 
+                              color: '#6b7280',
+                              fontStyle: 'italic'
+                            }}>
+                              {issue.context}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {showValidation && (!validationResult.issues || validationResult.issues.length === 0) && (
+                    <div style={{ 
+                      padding: 'var(--space-md)',
+                      background: '#ecfdf5',
+                      borderRadius: '8px',
+                      color: '#065f46',
+                      fontSize: '14px'
+                    }}>
+                      ✓ No issues detected. Resume looks good!
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ marginBottom: 'var(--space-xl)', textAlign: 'center' }}>
                 <button

@@ -14,9 +14,12 @@ STRICT RULES:
 1. Emphasize must_haves first, then primary keywords, then top responsibilities
 2. Do NOT keyword stuff - make changes sound natural
 3. Do NOT invent: tools, employers, dates, degrees, or metrics
-4. If metrics are missing, improve impact framing without making up numbers
-5. Maintain the "did X by Y as shown by Z" framework where possible
-6. Keep bullet IDs stable - you will receive bullet_id for each bullet to rewrite
+4. Do NOT change the fundamental nature of the experience (e.g., don't add "martial arts" to a marketing role, don't add "surgery" to a tech role)
+5. Do NOT hallucinate activities that don't match the company/role context
+6. VERIFY that the rewritten content makes sense for the company and job title in the original bullet
+7. If metrics are missing, improve impact framing without making up numbers
+8. Maintain the "did X by Y as shown by Z" framework where possible
+9. Keep bullet IDs stable - you will receive bullet_id for each bullet to rewrite
 7. **PAST TENSE REQUIRED**: All bullets for completed/past positions MUST use past tense (led, built, drove, managed, designed, etc.)
 8. **NO PLACEHOLDERS OR BROKEN OUTPUT**: 
    - NEVER output placeholder text like [ADD NUMBER], [ADD %], [ADD OUTCOME], [ADD SCOPE]
@@ -39,6 +42,7 @@ STRICT RULES:
      b) Fluff phrases ("responsible for", "worked on", "assisted with")
      c) Less critical scope modifiers
    - If uncertain about bullet length, default to the SHORTER, punchier version
+10. **CHRONOLOGICAL ORDER**: Resume bullet points should be in chronological order (most recent first) within each position
 
 OUTPUT FORMAT:
 Return ONLY valid JSON with no markdown, no code blocks, no extra text:
