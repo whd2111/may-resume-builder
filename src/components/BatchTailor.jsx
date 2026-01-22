@@ -40,7 +40,7 @@ Output the tailored resume as a valid JSON object with this structure:
   "additional": "..."
 }`;
 
-function BatchTailor({ primaryResume, onBack }) {
+function BatchTailor({ primaryResume, onBack, onNavigate }) {
   const { createApplication } = useApplications()
   const [jobs, setJobs] = useState([
     { id: 1, company: '', description: '' }
@@ -193,7 +193,7 @@ function BatchTailor({ primaryResume, onBack }) {
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No primary resume found. Please build one first to enable batch tailoring.
           </p>
-          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+          <button className="btn btn-primary" onClick={() => onNavigate('build')} style={{ marginTop: 'var(--space-md)' }}>
             Go to Resume Builder
           </button>
         </div>

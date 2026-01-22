@@ -7,7 +7,7 @@ import { scoreAndSelectBullets } from '../utils/bulletScorer'
 import { CHECKLIST_TAILORING_PROMPT } from '../utils/tailoringPrompts'
 import { useApplications } from '../hooks/useApplications'
 
-function Stage2Tailor({ primaryResume, onBack }) {
+function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const { createApplication } = useApplications()
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -197,7 +197,7 @@ Rewrite these bullets to emphasize the must-haves and primary keywords. Return J
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No primary resume found. Please build one first to enable tailoring.
           </p>
-          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+          <button className="btn btn-primary" onClick={() => onNavigate('build')} style={{ marginTop: 'var(--space-md)' }}>
             Go to Resume Builder
           </button>
         </div>

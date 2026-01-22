@@ -46,6 +46,13 @@ Welcome to May! Here's a guide to all the documentation files.
   - Design highlights
   - Future enhancements
 
+- **[BULLET_LENGTH_README.md](BULLET_LENGTH_README.md)** - Bullet length optimization
+  - Complete guide to orphan line prevention
+  - Phase 1: Prompt-based guidance (✅ implemented)
+  - Phase 2: Visual detection (future)
+  - Phase 3: Auto-refinement (future)
+  - Testing and monitoring metrics
+
 ### Deployment
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment options
   - Local deployment
@@ -69,6 +76,12 @@ Welcome to May! Here's a guide to all the documentation files.
   - Resume JSON schema
   - Sample data
   - Field explanations
+
+### Advanced Features
+- **[BULLET_LENGTH_README.md](BULLET_LENGTH_README.md)** - Bullet optimization overview
+- **[BULLET_LENGTH_EVALUATION.md](BULLET_LENGTH_EVALUATION.md)** - Approach evaluation
+- **[BULLET_LENGTH_IMPLEMENTATION.md](BULLET_LENGTH_IMPLEMENTATION.md)** - Phase 1 implementation
+- **[BULLET_LENGTH_PHASE2_3_GUIDE.md](BULLET_LENGTH_PHASE2_3_GUIDE.md)** - Advanced implementation guide
 
 ## 🎯 Quick Navigation by Task
 
@@ -96,6 +109,11 @@ Welcome to May! Here's a guide to all the documentation files.
 → [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) → Future Enhancement Ideas
 → [ARCHITECTURE.md](ARCHITECTURE.md) → Understand the structure
 → Start coding!
+
+### "I want to improve bullet formatting"
+→ [BULLET_LENGTH_README.md](BULLET_LENGTH_README.md) → Start here for overview
+→ [BULLET_LENGTH_EVALUATION.md](BULLET_LENGTH_EVALUATION.md) → Understand approaches
+→ [BULLET_LENGTH_IMPLEMENTATION.md](BULLET_LENGTH_IMPLEMENTATION.md) → See what's implemented
 
 ## 📂 File Structure
 
@@ -223,9 +241,9 @@ netlify deploy --prod
 
 ## 📊 Documentation Stats
 
-- **Total docs:** 8 files
-- **Total lines:** ~2,500+
-- **Reading time:** ~30 minutes for all docs
+- **Total docs:** 12 files (8 core + 4 bullet optimization)
+- **Total lines:** ~4,000+
+- **Reading time:** ~45 minutes for all docs
 - **Quickstart time:** 5 minutes
 - **Full understanding time:** 1-2 hours
 

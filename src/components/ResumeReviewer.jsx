@@ -500,7 +500,7 @@ Provide your review in this structure:
 
 Be direct, specific, and provide examples of how to improve weak bullets.`;
 
-function ResumeReviewer({ primaryResume, onBack }) {
+function ResumeReviewer({ primaryResume, onBack, onNavigate }) {
   const [review, setReview] = useState(null)
   const [isReviewing, setIsReviewing] = useState(false)
   const [error, setError] = useState('')
@@ -592,7 +592,7 @@ function ResumeReviewer({ primaryResume, onBack }) {
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No resume found. Please build one first to enable review.
           </p>
-          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+          <button className="btn btn-primary" onClick={() => onNavigate('build')} style={{ marginTop: 'var(--space-md)' }}>
             Go to Resume Builder
           </button>
         </div>

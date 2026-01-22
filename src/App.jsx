@@ -79,6 +79,7 @@ function App() {
         <TailorJobs
           primaryResume={primaryResume?.resume_data}
           onBack={handleBack}
+          onNavigate={handleNavigate}
           user={user}
         />
       )}
@@ -87,6 +88,7 @@ function App() {
         <ResumeReviewer
           primaryResume={primaryResume?.resume_data}
           onBack={handleBack}
+          onNavigate={handleNavigate}
           user={user}
         />
       )}

@@ -3,7 +3,7 @@ import Stage2Tailor from './Stage2Tailor'
 import BatchTailor from './BatchTailor'
 import { ArrowLeftIcon, TargetIcon, WritingIcon } from '../utils/icons'
 
-function TailorJobs({ primaryResume, onBack }) {
+function TailorJobs({ primaryResume, onBack, onNavigate }) {
   const [mode, setMode] = useState(null) // null, 'single', 'batch'
 
   if (mode === 'single') {
@@ -11,6 +11,7 @@ function TailorJobs({ primaryResume, onBack }) {
       <Stage2Tailor
           primaryResume={primaryResume}
         onBack={() => setMode(null)}
+        onNavigate={onNavigate}
       />
     )
   }
@@ -20,6 +21,7 @@ function TailorJobs({ primaryResume, onBack }) {
       <BatchTailor
           primaryResume={primaryResume}
         onBack={() => setMode(null)}
+        onNavigate={onNavigate}
       />
     )
   }
@@ -42,7 +44,7 @@ function TailorJobs({ primaryResume, onBack }) {
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No primary resume found. Please build one first to enable tailoring.
           </p>
-          <button className="btn btn-primary" onClick={onBack} style={{ marginTop: 'var(--space-md)' }}>
+          <button className="btn btn-primary" onClick={() => onNavigate('build')} style={{ marginTop: 'var(--space-md)' }}>
             Go to Resume Builder
           </button>
         </div>
