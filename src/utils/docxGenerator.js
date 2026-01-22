@@ -33,8 +33,8 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
       default: {
         document: {
           run: {
-            font: 'Arial',
-            size: 22 // 11pt
+            font: 'Times New Roman',
+            size: 20 // 10pt (half-points, so 20 = 10pt)
           }
         }
       }
@@ -68,10 +68,10 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
               height: 15840 // US Letter height in DXA
             },
             margin: {
-              top: 576,    // 0.4 inch (tighter margins)
-              right: 576,
-              bottom: 576,
-              left: 576
+              top: 720,    // 0.5 inch
+              right: 720,  // 0.5 inch
+              bottom: 720, // 0.5 inch
+              left: 720    // 0.5 inch
             }
           }
         },
@@ -83,7 +83,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
               new TextRun({
                 text: resumeData.name.toUpperCase(),
                 bold: true,
-                size: 26 // 13pt - slightly smaller
+                size: 24 // 12pt for name
               })
             ],
             spacing: { after: 60 }
@@ -107,7 +107,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
               new TextRun({
                 text: 'EDUCATION',
                 bold: true,
-                size: 22
+                size: 20
               })
             ],
             spacing: { after: 80 },
@@ -130,7 +130,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
               new TextRun({
                 text: 'EXPERIENCE',
                 bold: true,
-                size: 22
+                size: 20
               })
             ],
             spacing: { before: 180, after: 100 },
@@ -314,7 +314,7 @@ function generateExperienceSection(experience) {
             children: [
               new TextRun({
                 text: bullet,
-                size: 22
+                size: 20
               })
             ],
             spacing: { after: 80 }
