@@ -7,7 +7,10 @@ const DPI = 96 // Standard screen DPI
 const PAGE_HEIGHT_PX = US_LETTER_HEIGHT_INCHES * DPI // ~1056px
 const MARGIN_TOP_PX = 0.5 * DPI // 48px
 const MARGIN_BOTTOM_PX = 0.5 * DPI // 48px
-const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - MARGIN_TOP_PX - MARGIN_BOTTOM_PX // ~960px
+const CONTENT_HEIGHT_PX_RAW = PAGE_HEIGHT_PX - MARGIN_TOP_PX - MARGIN_BOTTOM_PX // ~960px
+// Apply 5% safety margin to account for DOCX rendering differences
+const SAFETY_MARGIN = 0.95
+const CONTENT_HEIGHT_PX = Math.floor(CONTENT_HEIGHT_PX_RAW * SAFETY_MARGIN) // ~912px
 
 /**
  * Measure the height of resume content when rendered
@@ -45,39 +48,58 @@ export function measureResumeHeight(resumeData) {
 /**
  * Render resume as HTML for measurement
  * This should match the DOCX styling as closely as possible
+ * IMPORTANT: Must include ALL sections that docxGenerator.js renders
  */
 function renderResumeHTML(resumeData) {
   let html = ''
   
-  // Header: Name
-  html += `<div style="text-align: right; font-size: 12pt; font-weight: bold; margin-bottom: 4px;">
-    ${escapeHTML(resumeData.name.toUpperCase())}
+  // Header: Name (centered, 14pt to match CBS standards)
+  html += `<div style="text-align: center; font-size: 14pt; font-weight: bold; margin-bottom: 2px;">
+    ${escapeHTML(toTitleCase(resumeData.name))}
   </div>`
   
-  // Contact
-  html += `<div style="text-align: right; font-size: 10pt; margin-bottom: 12px;">
-    ${escapeHTML(resumeData.contact.phone)} | ${escapeHTML(resumeData.contact.email)}
-  </div>`
+  // Contact (centered, pipe-separated)
+  const contactParts = [
+    resumeData.contact?.phone,
+    resumeData.contact?.email,
+    resumeData.contact?.linkedin
+  ].filter(Boolean)
+  
+  if (contactParts.length > 0) {
+    html += `<div style="text-align: center; font-size: 10pt; margin-bottom: 4px;">
+      ${escapeHTML(contactParts.join(' | '))}
+    </div>`
+  }
+  
+  // Summary Section (if present) - THIS WAS MISSING
+  if (resumeData.summary) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+      SUMMARY
+    </div>`
+    html += `<div style="font-size: 10pt; margin-bottom: 4px; text-align: justify;">
+      ${escapeHTML(resumeData.summary)}
+    </div>`
+  }
   
   // Education Section
-  html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 12px; margin-bottom: 6px;">
-    EDUCATION
-  </div>`
-  
-  if (resumeData.education) {
+  if (resumeData.education && resumeData.education.length > 0) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+      EDUCATION
+    </div>`
+    
     resumeData.education.forEach(edu => {
-      html += `<div style="margin-top: 8px;">
-        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt;">
-          <span>${escapeHTML(edu.institution.toUpperCase())}</span>
-          <span>${escapeHTML(edu.location)}</span>
+      html += `<div style="margin-top: 4px;">
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt;">
+          <span>${escapeHTML((edu.institution || '').toUpperCase())}</span>
+          <span style="font-weight: normal;">${escapeHTML(edu.dates || '')}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 4px;">
-          <span>${escapeHTML(edu.degree)}</span>
-          <span>${escapeHTML(edu.dates)}</span>
+        <div style="display: flex; justify-content: space-between; font-size: 10pt;">
+          <span>${escapeHTML(edu.degree || '')}</span>
+          <span style="font-style: italic;">${escapeHTML(edu.location || '')}</span>
         </div>`
       
       if (edu.details) {
-        html += `<div style="font-style: italic; font-size: 11pt; margin-bottom: 10px;">
+        html += `<div style="font-style: italic; font-size: 10pt; margin-bottom: 4px;">
           ${escapeHTML(edu.details)}
         </div>`
       }
@@ -87,26 +109,26 @@ function renderResumeHTML(resumeData) {
   }
   
   // Experience Section
-  html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 12px; margin-bottom: 6px;">
-    EXPERIENCE
-  </div>`
-  
-  if (resumeData.experience) {
+  if (resumeData.experience && resumeData.experience.length > 0) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+      EXPERIENCE
+    </div>`
+    
     resumeData.experience.forEach(exp => {
-      html += `<div style="margin-top: 8px;">
-        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt;">
-          <span>${escapeHTML(exp.company.toUpperCase())}</span>
-          <span>${escapeHTML(exp.location)}</span>
+      html += `<div style="margin-top: 4px;">
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt;">
+          <span>${escapeHTML((exp.company || '').toUpperCase())}</span>
+          <span style="font-weight: normal;">${escapeHTML(exp.dates || '')}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; font-style: italic; font-size: 11pt; margin-bottom: 8px;">
-          <span>${escapeHTML(exp.title)}</span>
-          <span>${escapeHTML(exp.dates)}</span>
+        <div style="display: flex; justify-content: space-between; font-size: 10pt; font-style: italic;">
+          <span>${escapeHTML(exp.title || '')}</span>
+          <span style="font-style: normal;">${escapeHTML(exp.location || '')}</span>
         </div>`
       
       if (exp.bullets && exp.bullets.length > 0) {
-        html += `<ul style="margin: 0; padding-left: 20px; margin-bottom: 8px;">`
+        html += `<ul style="margin: 0; padding-left: 18px; margin-top: 0; margin-bottom: 4px;">`
         exp.bullets.forEach(bullet => {
-          html += `<li style="margin-bottom: 4px; font-size: 10pt;">${escapeHTML(bullet)}</li>`
+          html += `<li style="margin-bottom: 0; font-size: 10pt; line-height: 1.2;">${escapeHTML(bullet)}</li>`
         })
         html += `</ul>`
       }
@@ -117,15 +139,63 @@ function renderResumeHTML(resumeData) {
   
   // Skills Section
   if (resumeData.skills) {
-    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 16px; margin-bottom: 8px;">
-      ADDITIONAL INFORMATION
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+      SKILLS
     </div>`
-    html += `<div style="font-size: 11pt; margin-bottom: 8px;">
-      <span style="font-weight: bold;">Technical &amp; Software: </span>${escapeHTML(resumeData.skills)}
+    html += `<div style="font-size: 10pt; margin-bottom: 4px;">
+      ${escapeHTML(resumeData.skills)}
     </div>`
   }
   
+  // Additional Section (if present)
+  if (resumeData.additional) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+      ADDITIONAL
+    </div>`
+    html += `<div style="font-size: 10pt; margin-bottom: 4px;">
+      ${escapeHTML(resumeData.additional)}
+    </div>`
+  }
+  
+  // Custom Sections (Awards, Volunteering, etc.)
+  if (resumeData.custom_sections && resumeData.custom_sections.length > 0) {
+    resumeData.custom_sections.forEach(section => {
+      html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: 6px; margin-bottom: 2px; font-size: 12pt;">
+        ${escapeHTML((section.title || '').toUpperCase())}
+      </div>`
+      
+      if (section.content && section.content.length > 0) {
+        // Check if entries are short enough for inline formatting
+        const isCompact = section.content.every(item => item.length < 80) && section.content.length <= 4
+        
+        if (isCompact) {
+          html += `<div style="font-size: 10pt; margin-bottom: 4px;">
+            ${escapeHTML(section.content.join(' • '))}
+          </div>`
+        } else {
+          html += `<ul style="margin: 0; padding-left: 18px; margin-bottom: 4px;">`
+          section.content.forEach(item => {
+            html += `<li style="margin-bottom: 0; font-size: 10pt; line-height: 1.2;">${escapeHTML(item)}</li>`
+          })
+          html += `</ul>`
+        }
+      }
+    })
+  }
+  
   return html
+}
+
+/**
+ * Convert string to Title Case (matching docxGenerator)
+ */
+function toTitleCase(str) {
+  if (!str) return ''
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }
 
 /**
@@ -153,18 +223,38 @@ export function compressResume(resumeData, currentHeight) {
   
   console.log(`Compression needed: ${(compressionNeeded * 100).toFixed(1)}% (${overage}px over)`)
   
-  // Strategy 1: Remove bullets from oldest experiences first
+  // Strategy 1: Trim custom sections first (Awards, Volunteering, etc.)
+  // These are often lower priority than core experience
+  if (compressed.custom_sections && compressed.custom_sections.length > 0) {
+    for (let i = compressed.custom_sections.length - 1; i >= 0; i--) {
+      const section = compressed.custom_sections[i]
+      if (section.content && section.content.length > 3) {
+        // Trim to 3 items max
+        const removed = section.content.length - 3
+        section.content = section.content.slice(0, 3)
+        console.log(`Trimmed ${removed} item(s) from custom section "${section.title}"`)
+        
+        const newHeight = measureResumeHeight(compressed)
+        if (newHeight <= CONTENT_HEIGHT_PX) {
+          return compressed
+        }
+      }
+    }
+  }
+  
+  // Strategy 2: Remove bullets from oldest experiences first
   if (compressed.experience && compressed.experience.length > 0) {
     // Start from the last (oldest) experience
     for (let i = compressed.experience.length - 1; i >= 0; i--) {
       const exp = compressed.experience[i]
       
-      if (exp.bullets && exp.bullets.length > 0) {
-        // Remove bullets one at a time from oldest experiences
+      if (exp.bullets && exp.bullets.length > 3) {
+        // Remove bullets one at a time from oldest experiences (keep at least 3)
         const bulletsToRemove = Math.max(1, Math.ceil(exp.bullets.length * compressionNeeded))
+        const targetLength = Math.max(3, exp.bullets.length - bulletsToRemove)
         
         // Remove last bullets (usually less important)
-        const removed = exp.bullets.splice(-bulletsToRemove)
+        const removed = exp.bullets.splice(targetLength)
         console.log(`Removed ${removed.length} bullet(s) from ${exp.company}`)
         
         // Check if we've compressed enough
@@ -176,7 +266,7 @@ export function compressResume(resumeData, currentHeight) {
     }
   }
   
-  // Strategy 2: Trim skills section if still over
+  // Strategy 3: Trim skills section if still over
   if (compressed.skills && compressed.skills.length > 100) {
     const maxSkillsLength = Math.floor(compressed.skills.length * 0.7)
     compressed.skills = compressed.skills.substring(0, maxSkillsLength).trim() + '...'
@@ -188,7 +278,26 @@ export function compressResume(resumeData, currentHeight) {
     }
   }
   
-  // Strategy 3: Remove education details
+  // Strategy 4: Shorten summary if present
+  if (compressed.summary && compressed.summary.length > 150) {
+    // Trim to ~150 chars, ending at a sentence boundary if possible
+    let trimmed = compressed.summary.substring(0, 150)
+    const lastPeriod = trimmed.lastIndexOf('.')
+    if (lastPeriod > 100) {
+      trimmed = trimmed.substring(0, lastPeriod + 1)
+    } else {
+      trimmed = trimmed.trim() + '...'
+    }
+    compressed.summary = trimmed
+    console.log('Shortened summary')
+    
+    const newHeight = measureResumeHeight(compressed)
+    if (newHeight <= CONTENT_HEIGHT_PX) {
+      return compressed
+    }
+  }
+  
+  // Strategy 5: Remove education details
   if (compressed.education) {
     compressed.education.forEach(edu => {
       if (edu.details) {
@@ -203,7 +312,7 @@ export function compressResume(resumeData, currentHeight) {
     }
   }
   
-  // Strategy 4: More aggressive bullet removal
+  // Strategy 6: More aggressive bullet removal (down to 2 per role)
   if (compressed.experience && compressed.experience.length > 0) {
     for (let i = compressed.experience.length - 1; i >= 0; i--) {
       const exp = compressed.experience[i]
@@ -221,6 +330,41 @@ export function compressResume(resumeData, currentHeight) {
     }
   }
   
+  // Strategy 7: Remove entire custom sections if still over
+  if (compressed.custom_sections && compressed.custom_sections.length > 0) {
+    while (compressed.custom_sections.length > 0) {
+      const removed = compressed.custom_sections.pop()
+      console.log(`Removed entire custom section "${removed.title}"`)
+      
+      const newHeight = measureResumeHeight(compressed)
+      if (newHeight <= CONTENT_HEIGHT_PX) {
+        return compressed
+      }
+    }
+  }
+  
+  // Strategy 8: Remove additional section if present
+  if (compressed.additional) {
+    delete compressed.additional
+    console.log('Removed additional section')
+    
+    const newHeight = measureResumeHeight(compressed)
+    if (newHeight <= CONTENT_HEIGHT_PX) {
+      return compressed
+    }
+  }
+  
+  // Strategy 9: Remove summary entirely as last resort before aggressive trim
+  if (compressed.summary) {
+    delete compressed.summary
+    console.log('Removed summary section')
+    
+    const newHeight = measureResumeHeight(compressed)
+    if (newHeight <= CONTENT_HEIGHT_PX) {
+      return compressed
+    }
+  }
+  
   return compressed
 }
 
@@ -230,17 +374,27 @@ export function compressResume(resumeData, currentHeight) {
  * @param {number} maxIterations - Maximum compression attempts
  * @returns {Object} - Final resume data guaranteed to fit one page
  */
-export async function ensureOnePage(resumeData, maxIterations = 3) {
+export async function ensureOnePage(resumeData, maxIterations = 5) {
   let currentData = JSON.parse(JSON.stringify(resumeData)) // Deep clone
+  
+  const initialHeight = measureResumeHeight(currentData)
+  console.log(`📏 Initial resume height: ${initialHeight}px (limit: ${CONTENT_HEIGHT_PX}px)`)
+  
+  if (initialHeight <= CONTENT_HEIGHT_PX) {
+    console.log('✅ Resume already fits on one page!')
+    return currentData
+  }
+  
+  console.log(`⚠️ Resume is ${initialHeight - CONTENT_HEIGHT_PX}px over limit, starting compression...`)
   
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     const height = measureResumeHeight(currentData)
-    const pageCount = Math.ceil(height / CONTENT_HEIGHT_PX)
+    const overagePercent = ((height - CONTENT_HEIGHT_PX) / CONTENT_HEIGHT_PX * 100).toFixed(1)
     
-    console.log(`Iteration ${iteration + 1}: Height = ${height}px, Pages = ${pageCount}`)
+    console.log(`Iteration ${iteration + 1}/${maxIterations}: Height = ${height}px (${overagePercent}% over)`)
     
     if (height <= CONTENT_HEIGHT_PX) {
-      console.log('✓ Resume fits on one page!')
+      console.log('✅ Resume now fits on one page!')
       return currentData
     }
     
@@ -251,8 +405,16 @@ export async function ensureOnePage(resumeData, maxIterations = 3) {
   // Final check - if still over, do aggressive trim
   const finalHeight = measureResumeHeight(currentData)
   if (finalHeight > CONTENT_HEIGHT_PX) {
-    console.warn('⚠️ Still over one page after max iterations, doing aggressive trim')
+    console.warn('🔥 Still over one page after max iterations, doing aggressive trim')
     currentData = aggressiveTrim(currentData)
+    
+    // Verify aggressive trim worked
+    const postTrimHeight = measureResumeHeight(currentData)
+    if (postTrimHeight > CONTENT_HEIGHT_PX) {
+      console.error(`❌ Even aggressive trim failed! Height: ${postTrimHeight}px (limit: ${CONTENT_HEIGHT_PX}px)`)
+    } else {
+      console.log(`✅ Aggressive trim successful! Final height: ${postTrimHeight}px`)
+    }
   }
   
   return currentData
@@ -266,8 +428,29 @@ export async function ensureOnePage(resumeData, maxIterations = 3) {
 function aggressiveTrim(resumeData) {
   const trimmed = JSON.parse(JSON.stringify(resumeData))
   
+  console.log('🔥 Running aggressive trim...')
+  
+  // Remove all custom sections
+  if (trimmed.custom_sections) {
+    console.log(`Removed all ${trimmed.custom_sections.length} custom sections`)
+    delete trimmed.custom_sections
+  }
+  
+  // Remove summary
+  if (trimmed.summary) {
+    console.log('Removed summary')
+    delete trimmed.summary
+  }
+  
+  // Remove additional
+  if (trimmed.additional) {
+    console.log('Removed additional')
+    delete trimmed.additional
+  }
+  
   // Keep only most recent 3 experiences
   if (trimmed.experience && trimmed.experience.length > 3) {
+    console.log(`Trimmed experiences from ${trimmed.experience.length} to 3`)
     trimmed.experience = trimmed.experience.slice(0, 3)
   }
   
@@ -288,6 +471,11 @@ function aggressiveTrim(resumeData) {
   // Remove education details
   if (trimmed.education) {
     trimmed.education.forEach(edu => delete edu.details)
+  }
+  
+  // Keep only most recent 2 education entries
+  if (trimmed.education && trimmed.education.length > 2) {
+    trimmed.education = trimmed.education.slice(0, 2)
   }
   
   return trimmed
