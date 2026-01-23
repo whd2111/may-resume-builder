@@ -73,19 +73,62 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
     })
   )
 
-  // Contact info
-  docChildren.push(
-    new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      children: [
-        new TextRun({
-          text: `${onePageData.contact.phone} | ${onePageData.contact.email}`,
-          size: 20 // 10pt
-        })
-      ],
-      spacing: { after: 180 }
-    })
-  )
+  // Contact info - build dynamically based on what's available
+  const contactParts = [
+    onePageData.contact?.phone,
+    onePageData.contact?.email,
+    onePageData.contact?.linkedin
+  ].filter(Boolean)
+  
+  if (contactParts.length > 0) {
+    docChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [
+          new TextRun({
+            text: contactParts.join(' | '),
+            size: 20 // 10pt
+          })
+        ],
+        spacing: { after: 180 }
+      })
+    )
+  }
+
+  // Summary section (if present)
+  if (onePageData.summary) {
+    docChildren.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'SUMMARY',
+            bold: true,
+            size: 20
+          })
+        ],
+        spacing: { after: 80 },
+        border: {
+          bottom: {
+            color: '000000',
+            space: 1,
+            style: BorderStyle.SINGLE,
+            size: 6
+          }
+        }
+      })
+    )
+    docChildren.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: onePageData.summary,
+            size: 20
+          })
+        ],
+        spacing: { after: 180 }
+      })
+    )
+  }
 
   // Education Section Header
   docChildren.push(
@@ -140,6 +183,11 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   // Skills/Additional Info Section
   if (onePageData.skills) {
     docChildren.push(...generateSkillsSection(onePageData.skills))
+  }
+
+  // Custom Sections (Awards, Endorsements, Volunteering, etc.)
+  if (onePageData.custom_sections && onePageData.custom_sections.length > 0) {
+    docChildren.push(...generateCustomSections(onePageData.custom_sections, rightTabPosition))
   }
 
   const doc = new Document({
@@ -374,10 +422,10 @@ function generateSkillsSection(skills) {
         new TextRun({
           text: 'ADDITIONAL INFORMATION',
           bold: true,
-          size: 22
+          size: 20
         })
       ],
-      spacing: { before: 240, after: 120 },
+      spacing: { before: 180, after: 80 },
       border: {
         bottom: {
           color: '000000',
@@ -390,16 +438,64 @@ function generateSkillsSection(skills) {
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Technical & Software: ',
-          size: 22,
-          bold: true
-        }),
-        new TextRun({
           text: skills,
-          size: 22
+          size: 20
         })
       ],
       spacing: { after: 120 }
     })
   ]
+}
+
+function generateCustomSections(customSections, rightTabPosition) {
+  if (!customSections || customSections.length === 0) return []
+
+  const elements = []
+
+  customSections.forEach((section) => {
+    // Section header
+    elements.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: section.title.toUpperCase(),
+            bold: true,
+            size: 20
+          })
+        ],
+        spacing: { before: 180, after: 80 },
+        border: {
+          bottom: {
+            color: '000000',
+            space: 1,
+            style: BorderStyle.SINGLE,
+            size: 6
+          }
+        }
+      })
+    )
+
+    // Section content as bullet points
+    if (section.content && section.content.length > 0) {
+      section.content.forEach((item) => {
+        elements.push(
+          new Paragraph({
+            numbering: {
+              reference: 'resume-bullets',
+              level: 0
+            },
+            children: [
+              new TextRun({
+                text: item,
+                size: 20
+              })
+            ],
+            spacing: { after: 80 }
+          })
+        )
+      })
+    }
+  })
+
+  return elements
 }

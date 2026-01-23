@@ -55,15 +55,21 @@ IMPORTANT:
 - Improve wording while staying truthful
 - If metrics are missing, suggest [ADD METRIC] where appropriate
 
+HANDLING MISSING INFORMATION:
+- If a field (phone, email, linkedin, location, etc.) is NOT present in the source resume, return null or an empty string for that field
+- Do NOT insert placeholders like "[ADD PHONE NUMBER]", "[ADD EMAIL]", "[YOUR CITY]", etc.
+- Only include information that is explicitly provided in the original resume
+
 Respond with a JSON object in this EXACT format:
 {
   "action": "rewritten_resume",
   "data": {
     "name": "Full Name",
+    "summary": "A brief 1-2 sentence professional summary if present in the original resume, otherwise null",
     "contact": {
-      "phone": "123-456-7890",
-      "email": "email@example.com",
-      "linkedin": "linkedin.com/in/username" (optional)
+      "phone": "123-456-7890 or null if not provided",
+      "email": "email@example.com or null if not provided",
+      "linkedin": "linkedin.com/in/username or null if not provided"
     },
     "education": [
       {
@@ -71,7 +77,7 @@ Respond with a JSON object in this EXACT format:
         "degree": "Degree Name",
         "location": "City, ST",
         "dates": "YYYY - YYYY",
-        "details": "Honors, GPA, etc." (optional)
+        "details": "Honors, GPA, etc. or null"
       }
     ],
     "experience": [
@@ -86,19 +92,29 @@ Respond with a JSON object in this EXACT format:
         ]
       }
     ],
-    "skills": "Skills listed" (optional),
-    "additional": "Any other sections" (optional)
+    "skills": "Skills listed or null",
+    "additional": "Any other standard sections or null",
+    "custom_sections": [
+      {
+        "title": "Section Title (e.g., Awards, Endorsements, Volunteering, Certifications, Publications)",
+        "content": ["Item 1", "Item 2", "Item 3"]
+      }
+    ]
   },
   "improvements": "Brief summary of the main improvements made"
-}`;
+}
+
+NOTE: The "custom_sections" array captures any non-standard sections like Awards, Endorsements, Volunteering, Certifications, Publications, Languages, etc. If no such sections exist, return an empty array [].`;
 
 function ResumeUpload({ onResumeComplete, onBack }) {
   const [file, setFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
+  const [showContactPrompter, setShowContactPrompter] = useState(false)
   const [showMetricPrompter, setShowMetricPrompter] = useState(false)
   const [improvements, setImprovements] = useState('')
   const [error, setError] = useState('')
+  const [contactForm, setContactForm] = useState({ phone: '', email: '', linkedin: '' })
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0]
@@ -177,10 +193,23 @@ function ResumeUpload({ onResumeComplete, onBack }) {
         setRewrittenResume(result.data)
         setImprovements(result.improvements || 'Resume rewritten successfully!')
 
-        // Check if resume has [ADD METRIC] placeholders
-        const hasMetrics = JSON.stringify(result.data).includes('[ADD METRIC]')
-        if (hasMetrics) {
-          setShowMetricPrompter(true)
+        // Check if contact info is missing (phone or email are essential)
+        const contact = result.data.contact || {}
+        const missingContact = !contact.phone || !contact.email
+        if (missingContact) {
+          // Pre-fill form with any existing values
+          setContactForm({
+            phone: contact.phone || '',
+            email: contact.email || '',
+            linkedin: contact.linkedin || ''
+          })
+          setShowContactPrompter(true)
+        } else {
+          // Check if resume has [ADD METRIC] placeholders
+          const hasMetrics = JSON.stringify(result.data).includes('[ADD METRIC]')
+          if (hasMetrics) {
+            setShowMetricPrompter(true)
+          }
         }
       } else {
         throw new Error('Could not parse rewritten resume')
@@ -219,12 +248,212 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     setShowMetricPrompter(false)
   }
 
+  const handleContactSave = () => {
+    // Update resume with contact info
+    const updatedResume = {
+      ...rewrittenResume,
+      contact: {
+        ...rewrittenResume.contact,
+        phone: contactForm.phone || rewrittenResume.contact?.phone || null,
+        email: contactForm.email || rewrittenResume.contact?.email || null,
+        linkedin: contactForm.linkedin || rewrittenResume.contact?.linkedin || null
+      }
+    }
+    setRewrittenResume(updatedResume)
+    setShowContactPrompter(false)
+
+    // Now check for metrics
+    const hasMetrics = JSON.stringify(updatedResume).includes('[ADD METRIC]')
+    if (hasMetrics) {
+      setShowMetricPrompter(true)
+    }
+  }
+
+  const handleContactSkip = () => {
+    setShowContactPrompter(false)
+    // Check for metrics even if contact was skipped
+    const hasMetrics = JSON.stringify(rewrittenResume).includes('[ADD METRIC]')
+    if (hasMetrics) {
+      setShowMetricPrompter(true)
+    }
+  }
+
   const handleStartOver = () => {
     setFile(null)
     setRewrittenResume(null)
+    setShowContactPrompter(false)
     setShowMetricPrompter(false)
+    setContactForm({ phone: '', email: '', linkedin: '' })
     setImprovements('')
     setError('')
+  }
+
+  // Show contact prompter if contact info is missing
+  if (showContactPrompter && rewrittenResume) {
+    const missingFields = []
+    if (!rewrittenResume.contact?.phone && !contactForm.phone) missingFields.push('phone')
+    if (!rewrittenResume.contact?.email && !contactForm.email) missingFields.push('email')
+    
+    return (
+      <div className="container" style={{ maxWidth: '600px' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <h1 className="page-title" style={{ fontSize: '24px', margin: 0, marginBottom: '8px' }}>
+            Add Your Contact Info
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
+            We noticed some contact details are missing from your resume. Add them below so recruiters can reach you.
+          </p>
+        </div>
+
+        <div className="card" style={{ 
+          background: 'linear-gradient(135deg, #fdfbf7 0%, #ffffff 100%)', 
+          borderLeft: '4px solid var(--accent-purple)',
+          marginBottom: '24px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+            <div style={{ 
+              fontSize: '20px', 
+              background: 'rgba(124, 58, 237, 0.1)', 
+              color: 'var(--accent-purple)',
+              minWidth: '40px', 
+              height: '40px', 
+              borderRadius: '50%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center' 
+            }}>
+              📱
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>
+                Missing Fields
+              </div>
+              <p style={{ fontSize: '16px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: '1.4' }}>
+                {missingFields.length > 0 
+                  ? `Please add your ${missingFields.join(' and ')}`
+                  : 'Review and confirm your contact details'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: '13px', 
+                fontWeight: '700', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                marginBottom: '8px', 
+                color: 'var(--text-secondary)' 
+              }}>
+                Phone Number {!rewrittenResume.contact?.phone && <span style={{ color: '#ef4444' }}>*</span>}
+              </label>
+              <input
+                type="tel"
+                value={contactForm.phone}
+                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                placeholder="(555) 123-4567"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '12px',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent-purple)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+              />
+            </div>
+
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: '13px', 
+                fontWeight: '700', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                marginBottom: '8px', 
+                color: 'var(--text-secondary)' 
+              }}>
+                Email Address {!rewrittenResume.contact?.email && <span style={{ color: '#ef4444' }}>*</span>}
+              </label>
+              <input
+                type="email"
+                value={contactForm.email}
+                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                placeholder="you@email.com"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '12px',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent-purple)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+              />
+            </div>
+
+            <div>
+              <label style={{ 
+                display: 'block', 
+                fontSize: '13px', 
+                fontWeight: '700', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.05em', 
+                marginBottom: '8px', 
+                color: 'var(--text-secondary)' 
+              }}>
+                LinkedIn URL <span style={{ fontWeight: '400', textTransform: 'none' }}>(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={contactForm.linkedin}
+                onChange={(e) => setContactForm({ ...contactForm, linkedin: e.target.value })}
+                placeholder="linkedin.com/in/yourname"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '16px',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '12px',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent-purple)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+              />
+            </div>
+          </div>
+
+          <div className="button-group" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
+            <button 
+              className="btn btn-ghost" 
+              onClick={handleContactSkip}
+            >
+              Skip for Now
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleContactSave}
+              disabled={!contactForm.phone && !contactForm.email && !rewrittenResume.contact?.phone && !rewrittenResume.contact?.email}
+            >
+              Save & Continue →
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Show metric prompter if resume has [ADD METRIC] placeholders
@@ -359,7 +588,19 @@ function ResumeUpload({ onResumeComplete, onBack }) {
               borderRadius: '16px'
             }}>
               <h3 style={{ fontSize: '20px', fontWeight: '800' }}>{rewrittenResume.name}</h3>
-              <p style={{ color: 'var(--text-secondary)' }}>{rewrittenResume.contact.email} | {rewrittenResume.contact.phone}</p>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                {[rewrittenResume.contact?.email, rewrittenResume.contact?.phone, rewrittenResume.contact?.linkedin]
+                  .filter(Boolean)
+                  .join(' | ') || 'No contact info provided'}
+              </p>
+              
+              {rewrittenResume.summary && (
+                <>
+                  <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+                  <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>{rewrittenResume.summary}</p>
+                </>
+              )}
+              
               <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
 
               {rewrittenResume.experience?.map((exp, idx) => (
@@ -372,6 +613,22 @@ function ResumeUpload({ onResumeComplete, onBack }) {
                   </ul>
                 </div>
               ))}
+
+              {rewrittenResume.custom_sections?.length > 0 && (
+                <>
+                  <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+                  {rewrittenResume.custom_sections.map((section, idx) => (
+                    <div key={idx} style={{ marginBottom: '16px' }}>
+                      <strong style={{ fontSize: '15px' }}>{section.title}</strong>
+                      <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                        {section.content?.map((item, itemIdx) => (
+                          <li key={itemIdx} style={{ marginBottom: '4px' }}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 
