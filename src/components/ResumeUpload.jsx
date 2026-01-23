@@ -52,9 +52,15 @@ FORMATTING:
 
 IMPORTANT:
 - Maintain all factual information - do NOT fabricate experience
-- Keep experience in reverse chronological order (most recent first)
 - Improve wording while staying truthful
 - If metrics are missing, suggest [ADD METRIC] where appropriate
+
+CHRONOLOGICAL ORDER (CRITICAL):
+- Experience MUST be in REVERSE CHRONOLOGICAL ORDER (most recent first)
+- Jobs with "Present" as the end date are CURRENT roles and should appear FIRST
+- Sort by end date: Present > 2024 > 2023 > 2022 > etc.
+- If two jobs have the same end date, the one with the more recent START date comes first
+- NEVER reorder based on relevance - recency is the ONLY sorting factor
 
 HANDLING MISSING INFORMATION:
 - If a field (phone, email, linkedin, location, etc.) is NOT present in the source resume, return null or an empty string for that field

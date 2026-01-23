@@ -487,10 +487,10 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   // Build document content using adaptive layout
   const docChildren = []
 
-  // ---- HEADER: Name (adaptive size, title case, bold, centered) ----
+  // ---- HEADER: Name (adaptive size, title case, bold, RIGHT ALIGNED) ----
   docChildren.push(
     new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: AlignmentType.RIGHT,
       children: [
         new TextRun({
           text: toTitleCase(onePageData.name),
@@ -503,7 +503,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
     })
   )
 
-  // ---- CONTACT INFO (adaptive size, single line with |, centered) ----
+  // ---- CONTACT INFO (adaptive size, single line with |, RIGHT ALIGNED) ----
   const contactParts = [
     onePageData.contact?.phone,
     onePageData.contact?.email,
@@ -513,7 +513,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   if (contactParts.length > 0) {
     docChildren.push(
       new Paragraph({
-        alignment: AlignmentType.CENTER,
+        alignment: AlignmentType.RIGHT,
         children: [
           new TextRun({
             text: contactParts.join(' | '),
