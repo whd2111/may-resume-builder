@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { useAuth } from './contexts/AuthContext'
 import { useResumes } from './hooks/useResumes'
+import { usePrimeResume } from './hooks/usePrimeResume'
+import { usePrimeBullets } from './hooks/usePrimeBullets'
 import Home from './components/Home'
 import BuildResume from './components/BuildResume'
 import TailorJobs from './components/TailorJobs'
@@ -14,7 +16,82 @@ import PatternExtractor from './components/PatternExtractor'
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
+  const { primeResume, ensurePrimeResume, loading: primeLoading } = usePrimeResume()
+  const { createBulletsBatch } = usePrimeBullets(primeResume?.id)
   const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns'
+  
+  // Track if we've already bootstrapped to prevent double-runs
+  const bootstrapRef = useRef(false)
+
+  // Bootstrap Prime Resume when user is authenticated
+  useEffect(() => {
+    const bootstrapPrimeResume = async () => {
+      // Only run once per session
+      if (bootstrapRef.current) return
+      if (!user) return
+      if (authLoading || resumesLoading || primeLoading) return
+
+      try {
+        // Ensure Prime Resume exists (creates one if it doesn't)
+        const prime = await ensurePrimeResume()
+        if (!prime) return
+
+        // Check if we need to import bullets from master resume
+        // We do this only once: when prime_resume has no bullets yet
+        const { data: existingBullets } = await import('./lib/supabase').then(m => 
+          m.supabase
+            .from('prime_bullets')
+            .select('id')
+            .eq('prime_resume_id', prime.id)
+            .limit(1)
+        )
+
+        // If bullets already exist, don't re-import
+        if (existingBullets && existingBullets.length > 0) {
+          bootstrapRef.current = true
+          return
+        }
+
+        // Import from master resume if available
+        if (primaryResume?.resume_data?.experience) {
+          console.log('Bootstrapping Prime Resume from master resume...')
+          const bulletsToImport = []
+
+          primaryResume.resume_data.experience.forEach(exp => {
+            if (!exp.bullets || !Array.isArray(exp.bullets)) return
+
+            exp.bullets.forEach(bulletText => {
+              if (!bulletText || typeof bulletText !== 'string') return
+
+              bulletsToImport.push({
+                prime_resume_id: prime.id,
+                company: exp.company || null,
+                role: exp.title || null,
+                bullet_text: bulletText,
+                source: 'import',
+                tags: [],
+                skills: [],
+                metrics: [],
+              })
+            })
+          })
+
+          if (bulletsToImport.length > 0) {
+            await createBulletsBatch(bulletsToImport)
+            console.log(`Imported ${bulletsToImport.length} bullets to Prime Resume`)
+          }
+        }
+
+        bootstrapRef.current = true
+      } catch (error) {
+        console.error('Error bootstrapping Prime Resume:', error)
+        // Don't block the app on bootstrap errors
+        bootstrapRef.current = true
+      }
+    }
+
+    bootstrapPrimeResume()
+  }, [user, authLoading, resumesLoading, primeLoading, primaryResume, ensurePrimeResume, createBulletsBatch])
 
   // Show loading state while auth is initializing
   if (authLoading) {

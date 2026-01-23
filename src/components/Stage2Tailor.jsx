@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
 import { generateDOCX } from '../utils/docxGenerator'
 import { ArrowLeftIcon, TargetIcon, WritingIcon, DownloadIcon, CheckIcon } from '../utils/icons'
@@ -7,9 +7,17 @@ import { scoreAndSelectBullets } from '../utils/bulletScorer'
 import { CHECKLIST_TAILORING_PROMPT } from '../utils/tailoringPrompts'
 import { useApplications } from '../hooks/useApplications'
 import { validateTailoredResume, quickValidate } from '../utils/tailoredResumeValidator'
+import { usePrimeResume } from '../hooks/usePrimeResume'
+import { usePrimeBullets } from '../hooks/usePrimeBullets'
+import { primeBulletsToResumeJson } from '../utils/primeResumeAdapter'
+import { useResumes } from '../hooks/useResumes'
 
 function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const { createApplication } = useApplications()
+  const { createResume, masterResume } = useResumes()
+  const { primeResume } = usePrimeResume()
+  const { bullets: primeBullets, loading: primeBulletsLoading } = usePrimeBullets(primeResume?.id)
+  
   const [jobDescription, setJobDescription] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState('') // 'checklist', 'scoring', 'tailoring', 'validating'
@@ -19,6 +27,9 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const [selection, setSelection] = useState(null)
   const [tailoredResume, setTailoredResume] = useState(null)
   const [rewrittenBullets, setRewrittenBullets] = useState(null)
+  
+  // The resume data used for scoring (prime or fallback)
+  const [scoringResumeData, setScoringResumeData] = useState(null)
   
   // Validation state
   const [validationResult, setValidationResult] = useState(null)
@@ -30,11 +41,42 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const [showComparison, setShowComparison] = useState(true)
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Determine the resume data to use for scoring
+  useEffect(() => {
+    if (primeBullets && primeBullets.length > 0 && primeResume) {
+      // Use Prime bullets converted to resume format
+      const primeResumeJson = primeBulletsToResumeJson(primeBullets, primeResume.summary_json || {})
+      // Merge with primary resume contact info if available
+      if (primaryResume) {
+        primeResumeJson.name = primeResumeJson.name || primaryResume.name
+        primeResumeJson.contact = primeResumeJson.contact?.email ? primeResumeJson.contact : primaryResume.contact
+        primeResumeJson.education = primeResumeJson.education?.length > 0 ? primeResumeJson.education : primaryResume.education
+        primeResumeJson.skills = primeResumeJson.skills?.length > 0 ? primeResumeJson.skills : primaryResume.skills
+      }
+      setScoringResumeData(primeResumeJson)
+      console.log('Using Prime Resume for tailoring:', {
+        bulletCount: primeBullets.length,
+        experienceCount: primeResumeJson.experience?.length
+      })
+    } else if (primaryResume) {
+      // Fallback to primary resume
+      setScoringResumeData(primaryResume)
+      console.log('Falling back to primary resume for tailoring')
+    }
+  }, [primeBullets, primeResume, primaryResume])
 
   // New checklist-based pipeline
   const handleAnalyzeWithChecklist = async (e) => {
     e.preventDefault()
     if (!jobDescription.trim()) return
+
+    // Use scoringResumeData (from Prime or fallback to primary)
+    const resumeToUse = scoringResumeData || primaryResume
+    if (!resumeToUse) {
+      alert('No resume data available. Please build a resume first.')
+      return
+    }
 
     setIsLoading(true)
     setChecklist(null)
@@ -46,11 +88,12 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
 
     try {
       // Debug: Log the resume being used for tailoring
-      console.log('Using primary resume for tailoring:', {
-        name: primaryResume?.name,
-        experienceCount: primaryResume?.experience?.length,
-        firstCompany: primaryResume?.experience?.[0]?.company,
-        bulletCount: primaryResume?.experience?.reduce((acc, exp) => acc + (exp.bullets?.length || 0), 0)
+      console.log('Using resume for tailoring:', {
+        source: primeBullets?.length > 0 ? 'Prime Resume' : 'Primary Resume',
+        name: resumeToUse?.name,
+        experienceCount: resumeToUse?.experience?.length,
+        firstCompany: resumeToUse?.experience?.[0]?.company,
+        bulletCount: resumeToUse?.experience?.reduce((acc, exp) => acc + (exp.bullets?.length || 0), 0)
       })
       // Step 1: Extract job checklist
       setLoadingStage('checklist')
@@ -59,12 +102,12 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
 
       // Step 2: Score and select bullets
       setLoadingStage('scoring')
-      const selectionResult = scoreAndSelectBullets(primaryResume, extractedChecklist)
+      const selectionResult = scoreAndSelectBullets(resumeToUse, extractedChecklist)
       setSelection(selectionResult)
 
       // Step 3: Tailor the selected bullets
       setLoadingStage('tailoring')
-      const { tailored, bullets } = await handleTailorSelectedBullets(extractedChecklist, selectionResult)
+      const { tailored, bullets } = await handleTailorSelectedBullets(extractedChecklist, selectionResult, resumeToUse)
 
       // Step 4: Validate the tailored resume
       setLoadingStage('validating')
@@ -79,7 +122,7 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
     }
   }
 
-  const handleTailorSelectedBullets = async (checklistData, selectionData) => {
+  const handleTailorSelectedBullets = async (checklistData, selectionData, resumeToUse) => {
     try {
       // Prepare the prompt with checklist and selected bullets, including original context
       const bulletsWithContext = selectionData.selected_bullets.map(bullet => {
@@ -87,7 +130,7 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
         const match = bullet.bullet_id.match(/exp(\d+)_bullet(\d+)/)
         if (match) {
           const expIndex = parseInt(match[1], 10)
-          const exp = primaryResume?.experience?.[expIndex]
+          const exp = resumeToUse?.experience?.[expIndex]
           return {
             ...bullet,
             original_company: exp?.company,
@@ -136,7 +179,7 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       const result = JSON.parse(cleanedResponse)
       
       // Apply the rewritten bullets to create tailored resume
-      const tailored = applyRewrittenBullets(primaryResume, result.rewritten_bullets)
+      const tailored = applyRewrittenBullets(resumeToUse, result.rewritten_bullets)
       
       // Return both the tailored resume and the rewritten bullets for validation
       return {
@@ -240,16 +283,44 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
 
     setIsSaving(true)
     try {
-      await createApplication({
+      // First create the application
+      const application = await createApplication({
         job_description: jobDescription,
         company_name: checklist.job_metadata?.company_name || 'Unknown Company',
         job_title: checklist.job_metadata?.job_title || 'Unknown Position',
         checklist_json: checklist,
         selection_json: selection,
-        resume_id: null, // Could link to master resume if needed
+        resume_id: null, // Will update after creating the derived resume
         tailored_resume_data: tailoredResume,
         status: 'tailored',
       })
+
+      // Create a derived resume with provenance
+      try {
+        const companyName = checklist.job_metadata?.company_name || 'Unknown'
+        const jobTitle = checklist.job_metadata?.job_title || 'Position'
+        const tailoredResumeTitle = `${companyName} - ${jobTitle}`
+        
+        const derivedResume = await createResume(
+          tailoredResumeTitle,
+          tailoredResume,
+          false, // not a master resume
+          `${companyName}: ${jobTitle}` // tailored_for
+        )
+
+        // Note: The derived resume will have prime_resume_id and application_id set
+        // if the resumes table has been updated with those columns.
+        // For now, we create the resume with basic provenance via tailored_for field.
+        
+        console.log('Saved tailored resume with provenance:', {
+          resumeId: derivedResume?.id,
+          applicationId: application?.id,
+          primeResumeId: primeResume?.id
+        })
+      } catch (resumeError) {
+        // Don't fail the whole operation if resume creation fails
+        console.warn('Could not save derived resume:', resumeError)
+      }
 
       setIsSaved(true)
       alert('Application saved to dashboard!')
@@ -276,19 +347,37 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       <div className="page-header">
         <h1 className="page-title">Tailor Your Resume</h1>
         <p className="page-subtitle">
-          {primaryResume
+          {(scoringResumeData || primaryResume)
             ? "Paste a job description and May will customize your resume to match the requirements"
             : "You need to build a primary 1-page resume first before tailoring"}
         </p>
-        {primaryResume && (
+        {scoringResumeData && (
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>
-            Using resume for: {primaryResume.name || 'Unknown'}
-            {primaryResume.experience && ` • ${primaryResume.experience.length} experience entries`}
+            {primeBullets?.length > 0 ? (
+              <>
+                <span style={{ 
+                  background: 'var(--accent-primary)', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  marginRight: '8px'
+                }}>
+                  Prime
+                </span>
+                Using Prime Resume • {primeBullets.length} bullets from {scoringResumeData.experience?.length || 0} experiences
+              </>
+            ) : (
+              <>
+                Using resume for: {scoringResumeData.name || 'Unknown'}
+                {scoringResumeData.experience && ` • ${scoringResumeData.experience.length} experience entries`}
+              </>
+            )}
           </p>
         )}
       </div>
 
-      {!primaryResume && (
+      {!scoringResumeData && !primaryResume && (
         <div className="card-premium" style={{ borderLeft: '4px solid #ef4444' }}>
           <p style={{ color: '#b91c1c', fontWeight: '500' }}>
             No primary resume found. Please build one first to enable tailoring.
@@ -299,7 +388,7 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
         </div>
       )}
 
-      {primaryResume && (
+      {(scoringResumeData || primaryResume) && (
         <>
           {!checklist && !tailoredResume && !isLoading && (
             <div className="card-premium">

@@ -4,12 +4,13 @@ import { useStories } from '../hooks/useStories'
 import { useApplications } from '../hooks/useApplications'
 import { ArrowLeftIcon, DownloadIcon, WritingIcon, TargetIcon } from '../utils/icons'
 import { generateDOCX } from '../utils/docxGenerator'
+import PrimeResumePanel from './PrimeResumePanel'
 
 export default function Dashboard({ onBack }) {
   const { resumes, loading: resumesLoading, deleteResume, setAsMaster } = useResumes()
   const { stories, loading: storiesLoading, createStory, updateStory, deleteStory } = useStories()
   const { applications, loading: applicationsLoading, deleteApplication, updateStatus } = useApplications()
-  const [activeTab, setActiveTab] = useState('resumes') // 'resumes', 'applications', or 'stories'
+  const [activeTab, setActiveTab] = useState('prime') // 'prime', 'resumes', 'applications', or 'stories'
   const [showAddStory, setShowAddStory] = useState(false)
   const [editingStory, setEditingStory] = useState(null)
   const [storyForm, setStoryForm] = useState({
@@ -186,8 +187,27 @@ export default function Dashboard({ onBack }) {
         display: 'flex', 
         gap: 'var(--space-md)', 
         marginBottom: 'var(--space-xl)',
-        borderBottom: '2px solid var(--border-subtle)'
+        borderBottom: '2px solid var(--border-subtle)',
+        overflowX: 'auto'
       }}>
+        <button
+          onClick={() => setActiveTab('prime')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 'var(--space-md) var(--space-lg)',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: activeTab === 'prime' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            borderBottom: activeTab === 'prime' ? '2px solid var(--accent-primary)' : 'none',
+            marginBottom: '-2px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          Prime Resume
+        </button>
         <button
           onClick={() => setActiveTab('resumes')}
           style={{
@@ -200,7 +220,8 @@ export default function Dashboard({ onBack }) {
             borderBottom: activeTab === 'resumes' ? '2px solid var(--accent-primary)' : 'none',
             marginBottom: '-2px',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
           }}
         >
           My Resumes ({resumes.length})
@@ -217,7 +238,8 @@ export default function Dashboard({ onBack }) {
             borderBottom: activeTab === 'applications' ? '2px solid var(--accent-primary)' : 'none',
             marginBottom: '-2px',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
           }}
         >
           Job Applications ({applications.length})
@@ -234,12 +256,18 @@ export default function Dashboard({ onBack }) {
             borderBottom: activeTab === 'stories' ? '2px solid var(--accent-primary)' : 'none',
             marginBottom: '-2px',
             cursor: 'pointer',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
           }}
         >
           Story Bank ({stories.length})
         </button>
       </div>
+
+      {/* Prime Resume Tab */}
+      {activeTab === 'prime' && (
+        <PrimeResumePanel />
+      )}
 
       {/* Resumes Tab */}
       {activeTab === 'resumes' && (
