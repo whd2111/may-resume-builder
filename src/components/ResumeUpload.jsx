@@ -119,6 +119,52 @@ IMPORTANT GPA EXTRACTION:
 
 NOTE: The "custom_sections" array captures any non-standard sections like Awards, Certifications, Publications, Languages, etc. If no such sections exist, return an empty array [].`;
 
+/**
+ * Sort experience array in reverse chronological order
+ * - "Present" jobs come first (current roles)
+ * - Then sorted by end year descending
+ * - If same end year, sort by start year descending
+ */
+function sortExperienceChronologically(experience) {
+  if (!experience || !Array.isArray(experience)) return experience
+  
+  return [...experience].sort((a, b) => {
+    const parseDate = (dateStr) => {
+      if (!dateStr) return { start: 0, end: 0, isPresent: false }
+      
+      // Check if it's a current role (contains "Present")
+      const isPresent = /present/i.test(dateStr)
+      
+      // Extract years - look for 4-digit numbers
+      const years = dateStr.match(/\d{4}/g) || []
+      const start = years[0] ? parseInt(years[0], 10) : 0
+      const end = isPresent ? 9999 : (years[1] ? parseInt(years[1], 10) : start)
+      
+      return { start, end, isPresent }
+    }
+    
+    const aDate = parseDate(a.dates)
+    const bDate = parseDate(b.dates)
+    
+    // Present jobs always come first
+    if (aDate.isPresent && !bDate.isPresent) return -1
+    if (!aDate.isPresent && bDate.isPresent) return 1
+    
+    // If both are Present, sort by start year (most recent start first)
+    if (aDate.isPresent && bDate.isPresent) {
+      return bDate.start - aDate.start
+    }
+    
+    // Sort by end year descending
+    if (bDate.end !== aDate.end) {
+      return bDate.end - aDate.end
+    }
+    
+    // If same end year, sort by start year descending
+    return bDate.start - aDate.start
+  })
+}
+
 // Prompt for trimming overflow content
 const TRIM_PROMPT = `You are May, an expert resume editor. The user's resume is currently OVER 1 PAGE and needs to be trimmed.
 
@@ -286,7 +332,15 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
       const jsonMatch = response.match(/\{[\s\S]*"action":\s*"rewritten_resume"[\s\S]*\}/)
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0])
-        setRewrittenResume(result.data)
+        
+        // CRITICAL: Sort experience in reverse chronological order (Present first)
+        // This ensures correct order even if AI didn't follow instructions
+        const sortedData = {
+          ...result.data,
+          experience: sortExperienceChronologically(result.data.experience)
+        }
+        
+        setRewrittenResume(sortedData)
         setImprovements(result.improvements || 'Resume rewritten successfully!')
 
         // Check if contact info is missing (phone or email are essential)

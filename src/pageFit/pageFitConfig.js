@@ -118,36 +118,36 @@ export const LAYOUT_BOUNDS = {
   // Section spacing before (in TWIPs)
   sectionSpacingBefore: {
     min: 60,           // 3pt
-    max: 280,          // 14pt
+    max: 400,          // 20pt - increased for sparse resumes
     step: 20,          // 1pt increments
-    default_cozy: 200, // 10pt
+    default_cozy: 240, // 12pt
     default_compact: 120, // 6pt
   },
   
   // Section spacing after (in TWIPs)
   sectionSpacingAfter: {
     min: 20,           // 1pt
-    max: 140,          // 7pt
+    max: 200,          // 10pt - increased for sparse resumes
     step: 20,          // 1pt increments
-    default_cozy: 80,  // 4pt
+    default_cozy: 100, // 5pt
     default_compact: 40, // 2pt
   },
   
   // Role/entry gap (in TWIPs)
   roleGap: {
     min: 40,           // 2pt minimum
-    max: 240,          // 12pt maximum
+    max: 360,          // 18pt - increased for sparse resumes
     step: 20,          // 1pt increments
-    default_cozy: 160, // 8pt
+    default_cozy: 200, // 10pt
     default_compact: 80, // 4pt
   },
   
   // Bullet spacing after (in TWIPs)
   bulletSpacing: {
     min: 0,            // 0pt (tight)
-    max: 80,           // 4pt
+    max: 120,          // 6pt - increased for sparse resumes
     step: 20,          // 1pt increments
-    default_cozy: 40,  // 2pt
+    default_cozy: 60,  // 3pt
     default_compact: 0, // 0pt
   },
   

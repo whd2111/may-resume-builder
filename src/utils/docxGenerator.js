@@ -102,8 +102,9 @@ async function runPageFitLoop(resumeData, initialLayout) {
   // If already fits, check if we should expand to fill the page better
   if (height <= contentLimit) {
     const fillPercent = (height / contentLimit) * 100
-    // If less than 92% filled, try expanding layout to use more space
-    if (fillPercent < 92) {
+    // If less than 95% filled, try expanding layout to use more space
+    // We want resumes to fill the page well, not have lots of white space
+    if (fillPercent < 95) {
       console.log(`📏 Underfull (${Math.round(fillPercent)}%), expanding layout to fill page...`)
       layoutVars = expandLayoutIteratively(layoutVars, height, contentLimit, resumeData)
       layout = getAdaptiveLayout(resumeData, layoutVars)
@@ -204,14 +205,14 @@ function compressLayoutStep(layoutVars) {
  */
 function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resumeData) {
   let vars = { ...layoutVars }
-  const maxIterations = 15
+  const maxIterations = 25 // More iterations for better fill
   
   // Expansion priority: spacing first (most visual impact), then line height, then fonts
   const expansionOrder = [
-    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
     { key: 'roleGap', bound: LAYOUT_BOUNDS.roleGap },
-    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
+    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
     { key: 'bulletSpacing', bound: LAYOUT_BOUNDS.bulletSpacing },
+    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
     { key: 'sectionSpacingAfter', bound: LAYOUT_BOUNDS.sectionSpacingAfter },
     { key: 'contactSpacingAfter', bound: LAYOUT_BOUNDS.contactSpacingAfter },
     { key: 'nameSpacingAfter', bound: LAYOUT_BOUNDS.nameSpacingAfter },
@@ -226,28 +227,33 @@ function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resume
     
     console.log(`📏 Expand iteration ${i + 1}: ${Math.round(fillPercent)}% filled`)
     
-    // Target: 90-98% filled (leave small buffer to avoid overflow)
-    if (fillPercent >= 90 && fillPercent <= 98) {
+    // Target: 93-99% filled - we want to fill the page well!
+    if (fillPercent >= 93 && fillPercent <= 99) {
       console.log(`✅ Good fill achieved: ${Math.round(fillPercent)}%`)
       break
     }
     
-    // If we somehow overflow, stop
-    if (fillPercent > 98) {
+    // If we overflow, stop
+    if (fillPercent > 99) {
       console.log(`⚠️ Near overflow, stopping expansion`)
       break
     }
     
-    // Try to expand one variable by one step
+    // Expand MULTIPLE variables per iteration for faster fill
     let expanded = false
+    let expansionsThisRound = 0
+    const maxExpansionsPerRound = 3 // Expand up to 3 variables per iteration
+    
     for (const { key, bound } of expansionOrder) {
+      if (expansionsThisRound >= maxExpansionsPerRound) break
+      
       const current = vars[key]
       const newValue = current + bound.step
       
       if (newValue <= bound.max) {
         vars[key] = newValue
         expanded = true
-        break // Only expand one variable per iteration
+        expansionsThisRound++
       }
     }
     
