@@ -39,6 +39,7 @@ function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const [showChecklist, setShowChecklist] = useState(false)
   const [showSelection, setShowSelection] = useState(false)
   const [showComparison, setShowComparison] = useState(true)
+  const [showFullPreview, setShowFullPreview] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   
@@ -254,6 +255,8 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
     setTailoredResume(null)
     setValidationResult(null)
     setRewrittenBullets(null)
+    setShowFullPreview(false)
+    setShowComparison(true)
   }
 
   const handleStartOver = () => {
@@ -264,6 +267,8 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
     setValidationResult(null)
     setRewrittenBullets(null)
     setIsSaved(false)
+    setShowFullPreview(false)
+    setShowComparison(true)
   }
 
   const handleDownload = async () => {
@@ -572,115 +577,335 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
 
           {tailoredResume && (
             <div className="stagger-1">
-              <div className="card-premium" style={{ borderLeft: '4px solid #10b981', background: '#f0fdf4' }}>
-                <div className="card-title" style={{ color: '#065f46' }}>
-                  <WritingIcon />
-                  Tailoring Complete
+              {/* Success Summary Card */}
+              <div className="card-premium" style={{ 
+                background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+                borderLeft: '4px solid #10b981',
+                textAlign: 'center',
+                padding: 'var(--space-2xl)'
+              }}>
+                <div style={{ 
+                  width: '64px', 
+                  height: '64px', 
+                  background: '#10b981', 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  margin: '0 auto var(--space-lg)',
+                  color: 'white'
+                }}>
+                  <CheckIcon />
                 </div>
-                <p style={{ color: '#065f46', fontSize: '15px', lineHeight: '1.6' }}>
-                  Tailored {selection?.selected_bullets.length || 0} bullets to emphasize job requirements
+                
+                <h2 style={{ 
+                  fontSize: '24px', 
+                  fontWeight: '700', 
+                  color: '#065f46',
+                  marginBottom: 'var(--space-sm)'
+                }}>
+                  Resume Tailored for {checklist?.job_metadata?.company_name || 'This Role'}
+                </h2>
+                <p style={{ 
+                  fontSize: '16px', 
+                  color: '#047857',
+                  marginBottom: 'var(--space-xl)'
+                }}>
+                  {checklist?.job_metadata?.job_title || 'Position'}
                 </p>
-              </div>
 
-              {/* Validation runs in background but is not shown to users */}
-
-              <div style={{ marginBottom: 'var(--space-xl)', textAlign: 'center' }}>
-                <button
-                  onClick={() => setShowComparison(!showComparison)}
-                  className="btn-secondary"
-                  style={{ fontSize: '14px', padding: '8px 16px' }}
-                >
-                  {showComparison ? 'Hide Changes' : 'Show Highlighted Changes'}
-                </button>
-              </div>
-
-              {/* Resume Preview with refined styles */}
-              <div className="card-premium" style={{ padding: 'var(--space-2xl)', background: 'white' }}>
-                <div style={{ textAlign: 'center', borderBottom: '2px solid var(--text-primary)', paddingBottom: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-                  <h1 style={{ fontSize: '32px', fontWeight: '800', marginBottom: 'var(--space-xs)' }}>{tailoredResume.name}</h1>
-                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                    {tailoredResume.contact.phone} | {tailoredResume.contact.email}
-                    {tailoredResume.contact.linkedin && ` | ${tailoredResume.contact.linkedin}`}
-                  </p>
+                {/* Stats Row */}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  gap: 'var(--space-xl)',
+                  flexWrap: 'wrap',
+                  marginBottom: 'var(--space-xl)'
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '32px', fontWeight: '700', color: '#059669' }}>
+                      {selection?.selected_bullets?.length || 0}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>Bullets Tailored</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '32px', fontWeight: '700', color: '#059669' }}>
+                      {selection?.coverage_report?.covered_must_haves?.length || 0}/{(selection?.coverage_report?.covered_must_haves?.length || 0) + (selection?.coverage_report?.missing_must_haves?.length || 0)}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>Must-Haves Covered</div>
+                  </div>
                 </div>
 
-                {/* Experience sections */}
-                {tailoredResume.experience && tailoredResume.experience.map((exp, expIdx) => (
-                  <div key={expIdx} style={{ marginBottom: 'var(--space-lg)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                      <span>{exp.company}</span>
-                      <span>{exp.location}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontStyle: 'italic', marginBottom: 'var(--space-sm)' }}>
-                      <span>{exp.title}</span>
-                      <span>{exp.dates}</span>
-                    </div>
-                    <ul style={{ paddingLeft: '20px' }}>
-                      {exp.bullets.map((bullet, bulletIdx) => {
-                        // Check if this bullet was rewritten
-                        const bulletId = `exp${expIdx}_bullet${bulletIdx}`
-                        const wasChanged = selection?.selected_bullets.some(b => b.bullet_id === bulletId)
-                        
-                        return (
-                          <li key={bulletIdx} style={{ 
-                            fontSize: '14px', 
-                            marginBottom: '6px',
-                            background: showComparison && wasChanged ? '#fff7ed' : 'transparent',
-                            padding: showComparison && wasChanged ? '4px 8px' : '0',
-                            borderRadius: '4px',
-                            borderLeft: showComparison && wasChanged ? '3px solid #f97316' : 'none'
-                          }}>
-                            {bullet}
-                          </li>
-                        )
-                      })}
-                    </ul>
+                {/* Missing Skills Warning */}
+                {selection?.coverage_report?.missing_must_haves?.length > 0 && (
+                  <div style={{ 
+                    background: '#fef3c7', 
+                    padding: 'var(--space-sm) var(--space-md)', 
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#92400e',
+                    marginBottom: 'var(--space-xl)',
+                    display: 'inline-block'
+                  }}>
+                    <strong>Not in your experience:</strong> {selection.coverage_report.missing_must_haves.join(', ')}
                   </div>
-                ))}
+                )}
+
+                {/* Primary Actions */}
+                <div style={{ display: 'flex', gap: 'var(--space-md)', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={handleDownload} className="btn btn-primary" style={{ minWidth: '180px' }}>
+                    <DownloadIcon />
+                    Download DOCX
+                  </button>
+                  <button 
+                    onClick={handleSaveApplication} 
+                    className="btn btn-secondary"
+                    disabled={isSaving || isSaved}
+                    style={{
+                      minWidth: '180px',
+                      background: isSaved ? '#10b981' : undefined,
+                      color: isSaved ? 'white' : undefined,
+                      borderColor: isSaved ? '#10b981' : undefined
+                    }}
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="loading" style={{ width: '16px', height: '16px' }}></div>
+                        Saving...
+                      </>
+                    ) : isSaved ? (
+                      <>
+                        <CheckIcon />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <CheckIcon />
+                        Save to Dashboard
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="button-group" style={{ marginTop: 'var(--space-xl)' }}>
-                <button 
-                  onClick={handleSaveApplication} 
-                  className="btn btn-primary"
-                  disabled={isSaving || isSaved}
-                  style={{
-                    background: isSaved ? '#10b981' : undefined,
-                    cursor: isSaved ? 'default' : undefined
+              {/* Changes Only Section */}
+              <div className="card-premium" style={{ marginTop: 'var(--space-lg)' }}>
+                <div 
+                  onClick={() => setShowComparison(!showComparison)}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    padding: 'var(--space-sm) 0'
                   }}
                 >
-                  {isSaving ? (
-                    <>
-                      <div className="loading" style={{ width: '16px', height: '16px' }}></div>
-                      Saving...
-                    </>
-                  ) : isSaved ? (
-                    <>
-                      <CheckIcon />
-                      Saved to Dashboard
-                    </>
-                  ) : (
-                    <>
-                      <CheckIcon />
-                      Save to Dashboard
-                    </>
-                  )}
-                </button>
-                <button onClick={handleDownload} className="btn btn-secondary">
-                  <DownloadIcon />
-                  Download DOCX
+                  <div className="card-title" style={{ margin: 0 }}>
+                    <WritingIcon />
+                    What Changed ({selection?.selected_bullets?.length || 0} bullets)
+                  </div>
+                  <span style={{ 
+                    fontSize: '20px', 
+                    color: 'var(--text-tertiary)',
+                    transform: showComparison ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+
+                {showComparison && (
+                  <div style={{ marginTop: 'var(--space-lg)' }}>
+                    {selection?.selected_bullets?.map((selectedBullet, idx) => {
+                      // Find the corresponding rewritten bullet
+                      const rewritten = rewrittenBullets?.find(b => b.bullet_id === selectedBullet.bullet_id)
+                      if (!rewritten) return null
+
+                      // Get company/role context
+                      const match = selectedBullet.bullet_id.match(/exp(\d+)_bullet(\d+)/)
+                      let company = ''
+                      let role = ''
+                      if (match) {
+                        const expIndex = parseInt(match[1], 10)
+                        const exp = (scoringResumeData || primaryResume)?.experience?.[expIndex]
+                        company = exp?.company || ''
+                        role = exp?.title || ''
+                      }
+
+                      return (
+                        <div key={selectedBullet.bullet_id} style={{ 
+                          marginBottom: 'var(--space-lg)',
+                          paddingBottom: 'var(--space-lg)',
+                          borderBottom: idx < selection.selected_bullets.length - 1 ? '1px solid var(--border-light)' : 'none'
+                        }}>
+                          {/* Company/Role Header */}
+                          <div style={{ 
+                            fontSize: '12px', 
+                            fontWeight: '600', 
+                            color: 'var(--text-tertiary)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            marginBottom: 'var(--space-sm)'
+                          }}>
+                            {company}{role ? ` • ${role}` : ''}
+                          </div>
+
+                          {/* Before */}
+                          <div style={{ 
+                            background: '#fef2f2', 
+                            padding: 'var(--space-sm) var(--space-md)',
+                            borderRadius: '8px',
+                            borderLeft: '3px solid #ef4444',
+                            marginBottom: 'var(--space-sm)',
+                            fontSize: '14px',
+                            lineHeight: '1.6'
+                          }}>
+                            <span style={{ 
+                              fontSize: '11px', 
+                              fontWeight: '600', 
+                              color: '#dc2626',
+                              display: 'block',
+                              marginBottom: '4px'
+                            }}>
+                              BEFORE
+                            </span>
+                            {selectedBullet.original_text}
+                          </div>
+
+                          {/* After */}
+                          <div style={{ 
+                            background: '#f0fdf4', 
+                            padding: 'var(--space-sm) var(--space-md)',
+                            borderRadius: '8px',
+                            borderLeft: '3px solid #10b981',
+                            fontSize: '14px',
+                            lineHeight: '1.6'
+                          }}>
+                            <span style={{ 
+                              fontSize: '11px', 
+                              fontWeight: '600', 
+                              color: '#059669',
+                              display: 'block',
+                              marginBottom: '4px'
+                            }}>
+                              AFTER
+                            </span>
+                            {rewritten.new_text}
+                          </div>
+
+                          {/* Matched Keywords */}
+                          {selectedBullet.matched_terms?.length > 0 && (
+                            <div style={{ 
+                              marginTop: 'var(--space-sm)',
+                              display: 'flex',
+                              gap: '6px',
+                              flexWrap: 'wrap'
+                            }}>
+                              {selectedBullet.matched_terms.slice(0, 4).map((term, termIdx) => (
+                                <span key={termIdx} style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  background: '#e0e7ff',
+                                  color: '#4338ca',
+                                  borderRadius: '4px'
+                                }}>
+                                  {term}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Full Resume Preview (Collapsed by Default) */}
+              <div className="card-premium" style={{ marginTop: 'var(--space-lg)' }}>
+                <div 
+                  onClick={() => setShowFullPreview(!showFullPreview)}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    padding: 'var(--space-sm) 0'
+                  }}
+                >
+                  <div className="card-title" style={{ margin: 0 }}>
+                    <TargetIcon />
+                    View Full Resume
+                  </div>
+                  <span style={{ 
+                    fontSize: '20px', 
+                    color: 'var(--text-tertiary)',
+                    transform: showFullPreview ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+
+                {showFullPreview && (
+                  <div style={{ marginTop: 'var(--space-lg)', padding: 'var(--space-lg)', background: '#fafafa', borderRadius: '12px' }}>
+                    <div style={{ textAlign: 'center', borderBottom: '2px solid var(--text-primary)', paddingBottom: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+                      <h1 style={{ fontSize: '28px', fontWeight: '800', marginBottom: 'var(--space-xs)' }}>{tailoredResume.name}</h1>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        {tailoredResume.contact.phone} | {tailoredResume.contact.email}
+                        {tailoredResume.contact.linkedin && ` | ${tailoredResume.contact.linkedin}`}
+                      </p>
+                    </div>
+
+                    {tailoredResume.experience && tailoredResume.experience.map((exp, expIdx) => (
+                      <div key={expIdx} style={{ marginBottom: 'var(--space-lg)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '14px' }}>
+                          <span>{exp.company}</span>
+                          <span>{exp.location}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontStyle: 'italic', marginBottom: 'var(--space-sm)' }}>
+                          <span>{exp.title}</span>
+                          <span>{exp.dates}</span>
+                        </div>
+                        <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                          {exp.bullets.map((bullet, bulletIdx) => {
+                            const bulletId = `exp${expIdx}_bullet${bulletIdx}`
+                            const wasChanged = selection?.selected_bullets.some(b => b.bullet_id === bulletId)
+                            
+                            return (
+                              <li key={bulletIdx} style={{ 
+                                fontSize: '13px', 
+                                marginBottom: '4px',
+                                lineHeight: '1.5',
+                                background: wasChanged ? '#fff7ed' : 'transparent',
+                                padding: wasChanged ? '2px 6px' : '0',
+                                borderRadius: '4px',
+                                marginLeft: wasChanged ? '-6px' : '0'
+                              }}>
+                                {bullet}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Secondary Actions */}
+              <div className="button-group" style={{ marginTop: 'var(--space-xl)', justifyContent: 'center' }}>
+                <button 
+                  onClick={handleStartOver}
+                  className="btn btn-secondary"
+                >
+                  Tailor for Another Job
                 </button>
                 <button 
                   onClick={handleRetailor} 
                   className="btn btn-secondary"
                 >
                   ← Back to Analysis
-                </button>
-                <button 
-                  onClick={handleStartOver}
-                  className="btn btn-secondary"
-                >
-                  Tailor for Another Job
                 </button>
               </div>
             </div>
