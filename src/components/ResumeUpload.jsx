@@ -77,7 +77,8 @@ Respond with a JSON object in this EXACT format:
         "degree": "Degree Name",
         "location": "City, ST",
         "dates": "YYYY - YYYY",
-        "details": "Honors, GPA, etc. or null"
+        "gpa": "3.74/4.0 or null if not present - EXTRACT GPA HERE if mentioned anywhere in education",
+        "details": "Honors, activities, relevant coursework, etc. (excluding GPA which goes in gpa field) or null"
       }
     ],
     "experience": [
@@ -103,6 +104,12 @@ Respond with a JSON object in this EXACT format:
   },
   "improvements": "Brief summary of the main improvements made"
 }
+
+IMPORTANT GPA EXTRACTION:
+- If a GPA is present anywhere in the education section (e.g., "GPA: 3.7", "3.7/4.0", "GPA 3.74"), extract it to the "gpa" field
+- Do NOT leave GPA buried in the "details" field - it should be in its own "gpa" field
+- Format GPA as "X.XX" or "X.XX/4.0" (include scale if available)
+- If no GPA is mentioned, set "gpa" to null
 
 NOTE: The "custom_sections" array captures any non-standard sections like Awards, Endorsements, Volunteering, Certifications, Publications, Languages, etc. If no such sections exist, return an empty array [].`;
 
@@ -601,7 +608,33 @@ function ResumeUpload({ onResumeComplete, onBack }) {
                 </>
               )}
               
+              {rewrittenResume.education?.length > 0 && (
+                <>
+                  <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+                  <strong style={{ fontSize: '15px', display: 'block', marginBottom: '8px' }}>Education</strong>
+                  {rewrittenResume.education.map((edu, idx) => (
+                    <div key={idx} style={{ marginBottom: '12px' }}>
+                      <div><strong>{edu.institution}</strong> — {edu.degree}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                        {edu.location} | {edu.dates}
+                      </div>
+                      {edu.gpa && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          <strong>GPA:</strong> {edu.gpa}
+                        </div>
+                      )}
+                      {edu.details && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          {edu.details}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+
               <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
+              <strong style={{ fontSize: '15px', display: 'block', marginBottom: '8px' }}>Experience</strong>
 
               {rewrittenResume.experience?.map((exp, idx) => (
                 <div key={idx} style={{ marginBottom: '16px' }}>

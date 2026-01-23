@@ -1,5 +1,15 @@
-// Resume Measurement & Compression Utilities
-// Ensures resumes fit exactly one page through render → measure → compress loop
+// Resume Measurement Utilities
+// 
+// IMPORTANT: The PageFit system now handles layout-only fitting.
+// This file provides measurement functions that support variable layout parameters.
+// Content modification functions (compressResume, etc.) are DEPRECATED and kept
+// only for backwards compatibility. New code should use PageFit instead.
+
+import { 
+  LAYOUT_BOUNDS, 
+  getDefaultLayoutVars,
+  calculateCharCount,
+} from '../pageFit/pageFitConfig.js'
 
 const US_LETTER_HEIGHT_INCHES = 11
 const US_LETTER_WIDTH_INCHES = 8.5
@@ -43,6 +53,226 @@ export function measureResumeHeight(resumeData) {
     // Clean up
     document.body.removeChild(measureDiv)
   }
+}
+
+/**
+ * Measure resume height with specific layout variables
+ * Used by PageFit to measure content with different layout settings
+ * 
+ * @param {Object} resumeData - Resume data structure (READ-ONLY)
+ * @param {Object} layoutVars - Layout variables from PageFit
+ * @returns {number} - Estimated height in pixels
+ */
+export function measureResumeHeightWithVars(resumeData, layoutVars) {
+  // Calculate width based on margins
+  const marginPx = (layoutVars.margins / 1440) * DPI
+  const contentWidth = (8.5 * DPI) - (marginPx * 2)
+  
+  // Convert font sizes from half-points to pt
+  const bodyFontPt = layoutVars.bodyFontSize / 2
+  const nameFontPt = layoutVars.nameFontSize / 2
+  const sectionHeaderFontPt = layoutVars.sectionHeaderFontSize / 2
+  
+  // Convert line height from TWIPs to multiplier (240 = 1.0)
+  const lineHeightMultiplier = layoutVars.lineHeight / 240
+  
+  // Create a hidden div to render the content
+  const measureDiv = document.createElement('div')
+  measureDiv.style.cssText = `
+    position: absolute;
+    left: -9999px;
+    width: ${contentWidth}px;
+    font-family: 'Times New Roman', serif;
+    font-size: ${bodyFontPt}pt;
+    line-height: ${lineHeightMultiplier};
+  `
+  
+  document.body.appendChild(measureDiv)
+  
+  try {
+    // Render resume content with layout-aware HTML
+    measureDiv.innerHTML = renderResumeHTMLWithVars(resumeData, {
+      bodyFontPt,
+      nameFontPt,
+      sectionHeaderFontPt,
+      lineHeightMultiplier,
+      sectionSpacingBeforePx: (layoutVars.sectionSpacingBefore / 20) * 1.333, // TWIPs to px
+      sectionSpacingAfterPx: (layoutVars.sectionSpacingAfter / 20) * 1.333,
+      roleGapPx: (layoutVars.roleGap / 20) * 1.333,
+      bulletSpacingPx: (layoutVars.bulletSpacing / 20) * 1.333,
+      contactSpacingAfterPx: (layoutVars.contactSpacingAfter / 20) * 1.333,
+      nameSpacingAfterPx: (layoutVars.nameSpacingAfter / 20) * 1.333,
+    })
+    
+    // Get actual height
+    const height = measureDiv.offsetHeight
+    
+    return height
+  } finally {
+    // Clean up
+    document.body.removeChild(measureDiv)
+  }
+}
+
+/**
+ * Render resume as HTML with specific layout variables for measurement
+ * This mirrors the DOCX output structure but uses layout vars for accurate measurement
+ */
+function renderResumeHTMLWithVars(resumeData, layoutVars) {
+  const {
+    bodyFontPt,
+    nameFontPt,
+    sectionHeaderFontPt,
+    lineHeightMultiplier,
+    sectionSpacingBeforePx,
+    sectionSpacingAfterPx,
+    roleGapPx,
+    bulletSpacingPx,
+    contactSpacingAfterPx,
+    nameSpacingAfterPx,
+  } = layoutVars
+  
+  let html = ''
+  
+  // Header: Name
+  html += `<div style="text-align: center; font-size: ${nameFontPt}pt; font-weight: bold; margin-bottom: ${nameSpacingAfterPx}px; line-height: ${lineHeightMultiplier};">
+    ${escapeHTML(toTitleCase(resumeData.name))}
+  </div>`
+  
+  // Contact
+  const contactParts = [
+    resumeData.contact?.phone,
+    resumeData.contact?.email,
+    resumeData.contact?.linkedin
+  ].filter(Boolean)
+  
+  if (contactParts.length > 0) {
+    html += `<div style="text-align: center; font-size: ${bodyFontPt}pt; margin-bottom: ${contactSpacingAfterPx}px; line-height: ${lineHeightMultiplier};">
+      ${escapeHTML(contactParts.join(' | '))}
+    </div>`
+  }
+  
+  // Summary Section
+  if (resumeData.summary) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+      SUMMARY
+    </div>`
+    html += `<div style="font-size: ${bodyFontPt}pt; margin-bottom: ${roleGapPx}px; text-align: justify; line-height: ${lineHeightMultiplier};">
+      ${escapeHTML(resumeData.summary)}
+    </div>`
+  }
+  
+  // Education Section
+  if (resumeData.education && resumeData.education.length > 0) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+      EDUCATION
+    </div>`
+    
+    resumeData.education.forEach(edu => {
+      html += `<div style="margin-top: ${roleGapPx / 2}px;">
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">
+          <span>${escapeHTML((edu.institution || '').toUpperCase())}</span>
+          <span style="font-weight: normal;">${escapeHTML(edu.dates || '')}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">
+          <span>${escapeHTML(edu.degree || '')}</span>
+          <span style="font-style: italic;">${escapeHTML(edu.location || '')}</span>
+        </div>`
+      
+      // GPA field (new)
+      if (edu.gpa) {
+        html += `<div style="font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">
+          <strong>GPA:</strong> ${escapeHTML(edu.gpa)}
+        </div>`
+      }
+      
+      if (edu.details) {
+        html += `<div style="font-style: italic; font-size: ${bodyFontPt}pt; margin-bottom: ${roleGapPx / 2}px; line-height: ${lineHeightMultiplier};">
+          ${escapeHTML(edu.details)}
+        </div>`
+      }
+      
+      html += `</div>`
+    })
+  }
+  
+  // Experience Section
+  if (resumeData.experience && resumeData.experience.length > 0) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+      EXPERIENCE
+    </div>`
+    
+    resumeData.experience.forEach(exp => {
+      html += `<div style="margin-top: ${roleGapPx / 2}px;">
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">
+          <span>${escapeHTML((exp.company || '').toUpperCase())}</span>
+          <span style="font-weight: normal;">${escapeHTML(exp.dates || '')}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: ${bodyFontPt}pt; font-style: italic; line-height: ${lineHeightMultiplier};">
+          <span>${escapeHTML(exp.title || '')}</span>
+          <span style="font-style: normal;">${escapeHTML(exp.location || '')}</span>
+        </div>`
+      
+      if (exp.bullets && exp.bullets.length > 0) {
+        html += `<ul style="margin: 0; padding-left: 18px; margin-top: 0; margin-bottom: ${roleGapPx}px;">`
+        exp.bullets.forEach((bullet, idx) => {
+          const isLast = idx === exp.bullets.length - 1
+          html += `<li style="margin-bottom: ${isLast ? 0 : bulletSpacingPx}px; font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">${escapeHTML(bullet)}</li>`
+        })
+        html += `</ul>`
+      }
+      
+      html += `</div>`
+    })
+  }
+  
+  // Skills Section
+  if (resumeData.skills) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+      SKILLS
+    </div>`
+    html += `<div style="font-size: ${bodyFontPt}pt; margin-bottom: ${roleGapPx}px; line-height: ${lineHeightMultiplier};">
+      ${escapeHTML(resumeData.skills)}
+    </div>`
+  }
+  
+  // Additional Section
+  if (resumeData.additional) {
+    html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+      ADDITIONAL
+    </div>`
+    html += `<div style="font-size: ${bodyFontPt}pt; margin-bottom: ${roleGapPx}px; line-height: ${lineHeightMultiplier};">
+      ${escapeHTML(resumeData.additional)}
+    </div>`
+  }
+  
+  // Custom Sections
+  if (resumeData.custom_sections && resumeData.custom_sections.length > 0) {
+    resumeData.custom_sections.forEach(section => {
+      html += `<div style="font-weight: bold; border-bottom: 1px solid black; margin-top: ${sectionSpacingBeforePx}px; margin-bottom: ${sectionSpacingAfterPx}px; font-size: ${sectionHeaderFontPt}pt;">
+        ${escapeHTML((section.title || '').toUpperCase())}
+      </div>`
+      
+      if (section.content && section.content.length > 0) {
+        const isCompact = section.content.every(item => item.length < 80) && section.content.length <= 4
+        
+        if (isCompact) {
+          html += `<div style="font-size: ${bodyFontPt}pt; margin-bottom: ${roleGapPx}px; line-height: ${lineHeightMultiplier};">
+            ${escapeHTML(section.content.join(' • '))}
+          </div>`
+        } else {
+          html += `<ul style="margin: 0; padding-left: 18px; margin-bottom: ${roleGapPx}px;">`
+          section.content.forEach((item, idx) => {
+            const isLast = idx === section.content.length - 1
+            html += `<li style="margin-bottom: ${isLast ? 0 : bulletSpacingPx}px; font-size: ${bodyFontPt}pt; line-height: ${lineHeightMultiplier};">${escapeHTML(item)}</li>`
+          })
+          html += `</ul>`
+        }
+      }
+    })
+  }
+  
+  return html
 }
 
 /**
@@ -209,6 +439,10 @@ export function fitsOnOnePage(resumeData) {
 }
 
 /**
+ * @deprecated Use PageFit system instead. This function modifies content which violates
+ * the principle that users should have full control over their content.
+ * The PageFit system adjusts ONLY layout parameters (fonts, spacing, margins).
+ * 
  * Compress resume to fit on one page
  * Uses deterministic trimming based on priority
  * @param {Object} resumeData - Resume data structure
@@ -216,6 +450,7 @@ export function fitsOnOnePage(resumeData) {
  * @returns {Object} - Compressed resume data
  */
 export function compressResume(resumeData, currentHeight) {
+  console.warn('⚠️ compressResume is deprecated. Use PageFit for layout-only fitting.')
   const compressed = JSON.parse(JSON.stringify(resumeData)) // Deep clone
   
   const overage = currentHeight - CONTENT_HEIGHT_PX
@@ -369,12 +604,17 @@ export function compressResume(resumeData, currentHeight) {
 }
 
 /**
+ * @deprecated Use PageFit system instead. This function modifies content which violates
+ * the principle that users should have full control over their content.
+ * The new docxGenerator uses PageFit for layout-only fitting.
+ * 
  * Ensure resume fits on one page using render → measure → compress loop
  * @param {Object} resumeData - Resume data structure
  * @param {number} maxIterations - Maximum compression attempts
  * @returns {Object} - Final resume data guaranteed to fit one page
  */
 export async function ensureOnePage(resumeData, maxIterations = 5) {
+  console.warn('⚠️ ensureOnePage is deprecated. docxGenerator now uses PageFit for layout-only fitting.')
   let currentData = JSON.parse(JSON.stringify(resumeData)) // Deep clone
   
   const initialHeight = measureResumeHeight(currentData)
