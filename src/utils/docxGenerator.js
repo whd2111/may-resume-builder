@@ -99,13 +99,13 @@ async function runPageFitLoop(resumeData, initialLayout) {
   
   console.log(`📏 Initial: ${height}px / ${contentLimit}px (${Math.round(height / contentLimit * 100)}%)`)
   
-  // If already fits, we're done
+  // If already fits, check if we should expand to fill the page better
   if (height <= contentLimit) {
-    // Check if significantly underfull (less than 85%)
     const fillPercent = (height / contentLimit) * 100
-    if (fillPercent < 85) {
-      console.log(`📏 Underfull (${Math.round(fillPercent)}%), expanding layout...`)
-      layoutVars = expandLayout(layoutVars, height, contentLimit)
+    // If less than 92% filled, try expanding layout to use more space
+    if (fillPercent < 92) {
+      console.log(`📏 Underfull (${Math.round(fillPercent)}%), expanding layout to fill page...`)
+      layoutVars = expandLayoutIteratively(layoutVars, height, contentLimit, resumeData)
       layout = getAdaptiveLayout(resumeData, layoutVars)
     }
     return layout
@@ -193,12 +193,77 @@ function compressLayoutStep(layoutVars) {
 }
 
 /**
- * Expand layout to fill underfull page
+ * Iteratively expand layout to fill underfull page
+ * Continues expanding until page is well-filled (90-98%) or max bounds reached
  * 
  * @param {Object} layoutVars - Current layout variables
  * @param {number} currentHeight - Current content height
- * @param {number} targetHeight - Target content height
+ * @param {number} targetHeight - Target content height (available page height)
+ * @param {Object} resumeData - Resume data for re-measurement
  * @returns {Object} - Expanded layout vars
+ */
+function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resumeData) {
+  let vars = { ...layoutVars }
+  const maxIterations = 15
+  
+  // Expansion priority: spacing first (most visual impact), then line height, then fonts
+  const expansionOrder = [
+    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
+    { key: 'roleGap', bound: LAYOUT_BOUNDS.roleGap },
+    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
+    { key: 'bulletSpacing', bound: LAYOUT_BOUNDS.bulletSpacing },
+    { key: 'sectionSpacingAfter', bound: LAYOUT_BOUNDS.sectionSpacingAfter },
+    { key: 'contactSpacingAfter', bound: LAYOUT_BOUNDS.contactSpacingAfter },
+    { key: 'nameSpacingAfter', bound: LAYOUT_BOUNDS.nameSpacingAfter },
+    { key: 'bodyFontSize', bound: LAYOUT_BOUNDS.bodyFontSize },
+  ]
+  
+  for (let i = 0; i < maxIterations; i++) {
+    // Measure current height with these vars
+    const height = measureResumeHeightWithVars(resumeData, vars)
+    const newContentLimit = getContentLimitPx(vars.margins)
+    const fillPercent = (height / newContentLimit) * 100
+    
+    console.log(`📏 Expand iteration ${i + 1}: ${Math.round(fillPercent)}% filled`)
+    
+    // Target: 90-98% filled (leave small buffer to avoid overflow)
+    if (fillPercent >= 90 && fillPercent <= 98) {
+      console.log(`✅ Good fill achieved: ${Math.round(fillPercent)}%`)
+      break
+    }
+    
+    // If we somehow overflow, stop
+    if (fillPercent > 98) {
+      console.log(`⚠️ Near overflow, stopping expansion`)
+      break
+    }
+    
+    // Try to expand one variable by one step
+    let expanded = false
+    for (const { key, bound } of expansionOrder) {
+      const current = vars[key]
+      const newValue = current + bound.step
+      
+      if (newValue <= bound.max) {
+        vars[key] = newValue
+        expanded = true
+        break // Only expand one variable per iteration
+      }
+    }
+    
+    // If nothing could be expanded, we're at max bounds
+    if (!expanded) {
+      console.log(`📏 All layout variables at maximum bounds`)
+      break
+    }
+  }
+  
+  return vars
+}
+
+/**
+ * @deprecated Use expandLayoutIteratively instead
+ * Expand layout to fill underfull page (single pass)
  */
 function expandLayout(layoutVars, currentHeight, targetHeight) {
   const vars = { ...layoutVars }
