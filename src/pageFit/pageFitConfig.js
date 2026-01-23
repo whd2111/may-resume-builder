@@ -4,6 +4,12 @@
  * Central configuration for layout parameters used by the PageFit system.
  * PageFit adjusts ONLY these layout variables - it NEVER modifies content.
  * 
+ * CBS RESUME STANDARDS COMPLIANCE:
+ * - Font: 10-12pt (Times New Roman)
+ * - Margins: 0.5-0.75 inches
+ * - NO summary/objective section
+ * - One page maximum
+ * 
  * All measurements:
  * - Font sizes: half-points (multiply pt by 2 for docx, or use pt directly for CSS)
  * - Spacing: TWIPs for docx (1pt = 20 TWIPs), px for CSS
@@ -60,48 +66,52 @@ export const DENSITY_THRESHOLDS = {
 
 export const LAYOUT_BOUNDS = {
   // Body font size (in half-points for DOCX, so 20 = 10pt)
+  // CBS STANDARD: 10-12pt
   bodyFontSize: {
-    min: 18,           // 9pt - absolute minimum for readability
-    max: 24,           // 12pt - maximum for body text
+    min: 20,           // 10pt - CBS minimum
+    max: 24,           // 12pt - CBS maximum
     step: 1,           // 0.5pt increments
     default_cozy: 22,  // 11pt for sparse resumes (good balance)
     default_compact: 20, // 10pt for dense resumes
   },
   
   // Name font size (in half-points)
+  // Name can be slightly larger than body text
   nameFontSize: {
     min: 24,           // 12pt minimum
-    max: 36,           // 18pt maximum
+    max: 32,           // 16pt maximum (not too large)
     step: 2,           // 1pt increments
-    default_cozy: 32,  // 16pt for sparse
-    default_compact: 28, // 14pt for dense
+    default_cozy: 28,  // 14pt for sparse
+    default_compact: 24, // 12pt for dense
   },
   
   // Section header font size (in half-points)
+  // CBS STANDARD: Same as body or slightly larger
   sectionHeaderFontSize: {
     min: 20,           // 10pt minimum
-    max: 28,           // 14pt maximum
+    max: 24,           // 12pt maximum (match body max)
     step: 2,           // 1pt increments
-    default_cozy: 24,  // 12pt for sparse
-    default_compact: 24, // 12pt for dense
+    default_cozy: 22,  // 11pt for sparse
+    default_compact: 20, // 10pt for dense
   },
   
   // Line height (as multiplier, e.g., 1.0 = single, 1.15, 1.25)
   // In TWIPs: 240 = 1.0, 276 = 1.15, 300 = 1.25, 360 = 1.5
   lineHeight: {
     min: 240,          // 1.0 (single spacing)
-    max: 336,          // 1.4 spacing
+    max: 300,          // 1.25 spacing max (keep professional)
     step: 12,          // ~0.05 increments
-    default_cozy: 300, // 1.25 for sparse
+    default_cozy: 276, // 1.15 for sparse
     default_compact: 240, // 1.0 for dense
   },
   
   // Page margins (in TWIPs, 1440 = 1 inch, 720 = 0.5 inch)
+  // CBS STANDARD: 0.5-0.75 inches
   margins: {
-    min: 576,          // 0.4 inches - minimum ATS-safe
-    max: 1440,         // 1.0 inch
+    min: 720,          // 0.5 inches - CBS minimum
+    max: 1080,         // 0.75 inch - CBS maximum
     step: 72,          // 0.05 inch increments
-    default_cozy: 1080, // 0.75 inch for sparse (better balance)
+    default_cozy: 1080, // 0.75 inch for sparse
     default_compact: 720, // 0.5 inch for dense
   },
   

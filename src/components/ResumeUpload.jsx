@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { callClaude } from '../utils/claudeApi'
-import { generateDOCX } from '../utils/docxGenerator'
+import { generateDOCX, measurePageFill } from '../utils/docxGenerator'
 import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import MetricPrompter from './MetricPrompter'
@@ -15,9 +15,10 @@ const REWRITE_PROMPT = `You are May, an expert resume rewriter following Columbi
 
 CBS RESUME STANDARDS:
 1. MUST stay on one page - be concise
-2. DO NOT re-order sections or add new sections
-3. Use Times New Roman, 10-12pt font (output as 10pt by default)
-4. Margins: 0.5 to 0.75 inches
+2. NO SUMMARY OR OBJECTIVE SECTION - CBS resumes do NOT include summary/objective statements
+3. Standard section order: Education, Experience, Additional (skills, activities, interests)
+4. Use Times New Roman, 10-12pt font (output as 10pt by default)
+5. Margins: 0.5 to 0.75 inches
 
 BULLET POINT RULES:
 - Two to six bullets per job title
@@ -51,7 +52,7 @@ FORMATTING:
 
 IMPORTANT:
 - Maintain all factual information - do NOT fabricate experience
-- Keep the same structure and section order
+- Keep experience in reverse chronological order (most recent first)
 - Improve wording while staying truthful
 - If metrics are missing, suggest [ADD METRIC] where appropriate
 
@@ -65,7 +66,6 @@ Respond with a JSON object in this EXACT format:
   "action": "rewritten_resume",
   "data": {
     "name": "Full Name",
-    "summary": "A brief 1-2 sentence professional summary if present in the original resume, otherwise null",
     "contact": {
       "phone": "123-456-7890 or null if not provided",
       "email": "email@example.com or null if not provided",
@@ -94,10 +94,10 @@ Respond with a JSON object in this EXACT format:
       }
     ],
     "skills": "Skills listed or null",
-    "additional": "Any other standard sections or null",
+    "additional": "Any other standard sections (activities, interests, languages) or null",
     "custom_sections": [
       {
-        "title": "Section Title (e.g., Awards, Endorsements, Volunteering, Certifications, Publications)",
+        "title": "Section Title (e.g., Awards, Certifications, Publications)",
         "content": ["Item 1", "Item 2", "Item 3"]
       }
     ]
@@ -111,7 +111,27 @@ IMPORTANT GPA EXTRACTION:
 - Format GPA as "X.XX" or "X.XX/4.0" (include scale if available)
 - If no GPA is mentioned, set "gpa" to null
 
-NOTE: The "custom_sections" array captures any non-standard sections like Awards, Endorsements, Volunteering, Certifications, Publications, Languages, etc. If no such sections exist, return an empty array [].`;
+NOTE: The "custom_sections" array captures any non-standard sections like Awards, Certifications, Publications, Languages, etc. If no such sections exist, return an empty array [].`;
+
+// Prompt for trimming overflow content
+const TRIM_PROMPT = `You are May, an expert resume editor. The user's resume is currently OVER 1 PAGE and needs to be trimmed.
+
+YOUR TASK: Trim the resume to fit on exactly 1 page by removing approximately {LINES_OVER} lines worth of content.
+
+TRIMMING RULES (in priority order):
+1. FIRST: Shorten verbose bullets - tighten language, remove filler words
+2. SECOND: Remove the LEAST impactful bullets from roles with 5+ bullets (keep min 2-3 per role)
+3. THIRD: Combine similar bullets if possible
+4. FOURTH: Trim older/less relevant experience more aggressively than recent experience
+5. NEVER remove entire jobs or education entries
+6. NEVER fabricate or change factual information
+7. Preserve the most impressive metrics and achievements
+
+ESTIMATE: Each bullet point is roughly 1-2 lines. To remove {LINES_OVER} lines, you may need to:
+- Remove {BULLETS_TO_REMOVE} bullet points, OR
+- Significantly shorten {BULLETS_TO_SHORTEN} bullets
+
+Return the trimmed resume in the EXACT same JSON format as the input, with an "improvements" field describing what was trimmed.`;
 
 function ResumeUpload({ onResumeComplete, onBack }) {
   const [file, setFile] = useState(null)
@@ -122,6 +142,69 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const [improvements, setImprovements] = useState('')
   const [error, setError] = useState('')
   const [contactForm, setContactForm] = useState({ phone: '', email: '', linkedin: '' })
+  const [pageFill, setPageFill] = useState(null)
+  const [showTrimModal, setShowTrimModal] = useState(false)
+  const [linesOver, setLinesOver] = useState('')
+  const [isTrimming, setIsTrimming] = useState(false)
+
+  // Measure page fill when resume changes
+  useEffect(() => {
+    if (rewrittenResume) {
+      const fill = measurePageFill(rewrittenResume)
+      setPageFill(fill)
+    } else {
+      setPageFill(null)
+    }
+  }, [rewrittenResume])
+
+  // Handle trimming overflow content
+  const handleTrimOverflow = async () => {
+    if (!linesOver || !rewrittenResume) return
+    
+    const lines = parseInt(linesOver, 10)
+    if (isNaN(lines) || lines <= 0) {
+      setError('Please enter a valid number of lines')
+      return
+    }
+
+    setIsTrimming(true)
+    setError('')
+    setShowTrimModal(false)
+
+    try {
+      // Calculate estimates for the prompt
+      const bulletsToRemove = Math.ceil(lines / 1.5)
+      const bulletsToShorten = Math.ceil(lines * 1.5)
+      
+      const systemPrompt = TRIM_PROMPT
+        .replace(/{LINES_OVER}/g, lines.toString())
+        .replace('{BULLETS_TO_REMOVE}', bulletsToRemove.toString())
+        .replace('{BULLETS_TO_SHORTEN}', bulletsToShorten.toString())
+
+      const userMessage = `Here is the resume that needs to be trimmed by approximately ${lines} lines:
+
+${JSON.stringify(rewrittenResume, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+      const response = await callClaude(null, [{ role: 'user', content: userMessage }], systemPrompt)
+
+      // Parse response
+      const jsonMatch = response.match(/\{[\s\S]*"name"[\s\S]*\}/)
+      if (jsonMatch) {
+        const trimmedData = JSON.parse(jsonMatch[0])
+        setRewrittenResume(trimmedData)
+        setImprovements(`Trimmed ~${lines} lines: ${trimmedData.improvements || 'Content condensed to fit 1 page'}`)
+        setLinesOver('')
+      } else {
+        throw new Error('Could not parse trimmed resume')
+      }
+    } catch (err) {
+      setError(`Error trimming resume: ${err.message}`)
+    } finally {
+      setIsTrimming(false)
+    }
+  }
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0]
@@ -583,6 +666,159 @@ function ResumeUpload({ onResumeComplete, onBack }) {
             <p style={{ color: '#065f46', fontSize: '15px' }}>{improvements}</p>
           </div>
 
+          {/* Page Fill Indicator */}
+          {pageFill && (
+            <div className="card-premium" style={{ 
+              background: pageFill.status === 'overflow' ? '#fef2f2' : 
+                         pageFill.status === 'tight' ? '#fffbeb' : '#f0fdf4',
+              borderLeft: `4px solid ${
+                pageFill.status === 'overflow' ? '#ef4444' : 
+                pageFill.status === 'tight' ? '#f59e0b' : '#10b981'
+              }`,
+              padding: '16px 20px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--text-primary)' }}>
+                  Page Fill: {pageFill.fillPercent}%
+                </span>
+                <span style={{ 
+                  fontSize: '12px', 
+                  padding: '2px 8px', 
+                  borderRadius: '9999px',
+                  background: pageFill.status === 'overflow' ? '#fee2e2' : 
+                             pageFill.status === 'tight' ? '#fef3c7' : '#d1fae5',
+                  color: pageFill.status === 'overflow' ? '#b91c1c' : 
+                        pageFill.status === 'tight' ? '#92400e' : '#065f46'
+                }}>
+                  {pageFill.status === 'overflow' ? '⚠️ Over 1 page' : 
+                   pageFill.status === 'tight' ? '📄 Tight fit' : '✓ Fits well'}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div style={{ 
+                height: '8px', 
+                background: '#e5e7eb', 
+                borderRadius: '4px', 
+                overflow: 'hidden',
+                marginBottom: '8px'
+              }}>
+                <div style={{ 
+                  width: `${Math.min(pageFill.fillPercent, 100)}%`, 
+                  height: '100%',
+                  background: pageFill.status === 'overflow' ? '#ef4444' : 
+                             pageFill.status === 'tight' ? '#f59e0b' : '#10b981',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ 
+                  fontSize: '13px', 
+                  color: 'var(--text-secondary)', 
+                  margin: 0 
+                }}>
+                  {pageFill.message}
+                </p>
+                {(pageFill.status === 'overflow' || pageFill.status === 'tight') && (
+                  <button
+                    onClick={() => setShowTrimModal(true)}
+                    style={{
+                      fontSize: '13px',
+                      padding: '4px 12px',
+                      background: 'var(--accent-purple)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    ✂️ Fix Overflow
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Trim Modal */}
+          {showTrimModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}>
+              <div className="card" style={{ 
+                maxWidth: '400px', 
+                width: '90%', 
+                padding: '24px',
+                background: 'white',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+              }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>✂️ Trim to Fit 1 Page</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
+                  Download the resume, open in Word, and count how many lines it overflows. 
+                  May will intelligently trim content to fit.
+                </p>
+                
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ 
+                    display: 'block', 
+                    fontSize: '13px', 
+                    fontWeight: '600', 
+                    marginBottom: '6px',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    How many lines over 1 page?
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={linesOver}
+                    onChange={(e) => setLinesOver(e.target.value)}
+                    placeholder="e.g., 3"
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      fontSize: '16px',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '8px',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent-purple)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                  />
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                    Tip: Each bullet is roughly 1-2 lines. 3 lines over ≈ trim 2 bullets.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                  <button 
+                    className="btn btn-ghost"
+                    onClick={() => { setShowTrimModal(false); setLinesOver(''); }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    className="btn btn-primary"
+                    onClick={handleTrimOverflow}
+                    disabled={!linesOver || isTrimming}
+                  >
+                    {isTrimming ? 'Trimming...' : 'Trim Resume'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="card-premium" style={{ background: 'white' }}>
             <div className="card-title">Preview</div>
             <div style={{
@@ -600,13 +836,6 @@ function ResumeUpload({ onResumeComplete, onBack }) {
                   .filter(Boolean)
                   .join(' | ') || 'No contact info provided'}
               </p>
-              
-              {rewrittenResume.summary && (
-                <>
-                  <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid var(--border-subtle)' }} />
-                  <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>{rewrittenResume.summary}</p>
-                </>
-              )}
               
               {rewrittenResume.education?.length > 0 && (
                 <>

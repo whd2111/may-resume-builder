@@ -526,23 +526,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
     )
   }
 
-  // ---- SUMMARY SECTION (if present) ----
-  if (onePageData.summary) {
-    docChildren.push(createSectionHeader('Summary', layout))
-    docChildren.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: onePageData.summary,
-            size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          })
-        ],
-        spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT },
-        alignment: AlignmentType.JUSTIFIED
-      })
-    )
-  }
+  // NOTE: CBS resumes do NOT include Summary/Objective sections - omitted per CBS standards
 
   // ---- EDUCATION SECTION ----
   if (onePageData.education && onePageData.education.length > 0) {
@@ -907,4 +891,48 @@ function generateCustomSections(customSections, layout) {
   })
 
   return elements
+}
+
+// ============================================
+// PAGE FIT INDICATOR (for UI feedback)
+// ============================================
+
+/**
+ * Calculate page fill percentage for a resume
+ * Used to show visual indicator before download
+ * 
+ * @param {Object} resumeData - Resume data structure
+ * @returns {Object} - { fillPercent, status, message }
+ */
+export function measurePageFill(resumeData) {
+  try {
+    const charCount = calculateCharCount(resumeData)
+    const layoutVars = getDefaultLayoutVars(charCount)
+    const height = measureResumeHeightWithVars(resumeData, layoutVars)
+    const contentLimit = getContentLimitPx(layoutVars.margins)
+    const fillPercent = Math.round((height / contentLimit) * 100)
+    
+    let status, message
+    if (fillPercent > 100) {
+      status = 'overflow'
+      message = `Content exceeds 1 page (~${fillPercent - 100}% over). Layout will auto-compress.`
+    } else if (fillPercent > 95) {
+      status = 'tight'
+      message = 'Fits on 1 page (tight fit)'
+    } else if (fillPercent > 75) {
+      status = 'good'
+      message = 'Fits well on 1 page'
+    } else if (fillPercent > 50) {
+      status = 'comfortable'
+      message = 'Fits on 1 page with room to spare'
+    } else {
+      status = 'sparse'
+      message = 'Content is sparse - layout will expand to fill page'
+    }
+    
+    return { fillPercent, status, message, charCount }
+  } catch (e) {
+    console.error('Error measuring page fill:', e)
+    return { fillPercent: 0, status: 'unknown', message: 'Unable to measure', charCount: 0 }
+  }
 }
