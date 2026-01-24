@@ -12,6 +12,34 @@ import { usePrimeBullets } from '../hooks/usePrimeBullets'
 import { primeBulletsToResumeJson } from '../utils/primeResumeAdapter'
 import { useResumes } from '../hooks/useResumes'
 
+/**
+ * Sort experience array in reverse chronological order
+ * Present jobs come first, then sorted by end year descending
+ */
+function sortExperienceChronologically(experience) {
+  if (!experience || !Array.isArray(experience)) return experience
+  
+  return [...experience].sort((a, b) => {
+    const parseDate = (dateStr) => {
+      if (!dateStr) return { start: 0, end: 0, isPresent: false }
+      const isPresent = /present/i.test(dateStr)
+      const years = dateStr.match(/\d{4}/g) || []
+      const start = years[0] ? parseInt(years[0], 10) : 0
+      const end = isPresent ? 9999 : (years[1] ? parseInt(years[1], 10) : start)
+      return { start, end, isPresent }
+    }
+    
+    const aDate = parseDate(a.dates)
+    const bDate = parseDate(b.dates)
+    
+    if (aDate.isPresent && !bDate.isPresent) return -1
+    if (!aDate.isPresent && bDate.isPresent) return 1
+    if (aDate.isPresent && bDate.isPresent) return bDate.start - aDate.start
+    if (bDate.end !== aDate.end) return bDate.end - aDate.end
+    return bDate.start - aDate.start
+  })
+}
+
 function Stage2Tailor({ primaryResume, onBack, onNavigate }) {
   const { createApplication } = useApplications()
   const { createResume, masterResume } = useResumes()
@@ -241,10 +269,8 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       }
     })
 
-    // Ensure bullets are in chronological order (most recent first) within each experience
-    // Note: This assumes bullets in the original resume are already chronologically ordered
-    // If they're not, this preserves the original order
-    // The chronological order rule in the prompt ensures NEW bullets are written chronologically
+    // CRITICAL: Sort experience in reverse chronological order (Present jobs first)
+    tailored.experience = sortExperienceChronologically(tailored.experience)
 
     return tailored
   }

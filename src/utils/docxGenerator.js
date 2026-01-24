@@ -89,7 +89,7 @@ const FONT_FAMILY = 'Times New Roman'
  * @returns {Object} - Optimized layout configuration
  */
 async function runPageFitLoop(resumeData, initialLayout) {
-  const maxIterations = 10
+  const maxIterations = 20 // Increased for more aggressive compression
   let layout = { ...initialLayout }
   let layoutVars = { ...layout._layoutVars }
   
@@ -122,6 +122,16 @@ async function runPageFitLoop(resumeData, initialLayout) {
     // If no more compression possible, stop
     if (!newLayoutVars) {
       console.log(`📏 No more layout compression possible at iteration ${i + 1}`)
+      
+      // Check final overflow amount
+      const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars)
+      const finalLimit = getContentLimitPx(layoutVars.margins)
+      const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100)
+      
+      if (overflowPercent > 0) {
+        console.warn(`⚠️ CONTENT STILL OVERFLOWS by ${overflowPercent}% - Resume may exceed 1 page`)
+        console.warn(`⚠️ Consider using the "Fix Overflow" feature to trim content`)
+      }
       break
     }
     

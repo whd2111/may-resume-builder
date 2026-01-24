@@ -4,6 +4,34 @@ import { generateDOCX } from '../utils/docxGenerator'
 import { ArrowLeftIcon, WritingIcon, TargetIcon, DownloadIcon, CheckIcon } from '../utils/icons'
 import { useApplications } from '../hooks/useApplications'
 
+/**
+ * Sort experience array in reverse chronological order
+ * Present jobs come first, then sorted by end year descending
+ */
+function sortExperienceChronologically(experience) {
+  if (!experience || !Array.isArray(experience)) return experience
+  
+  return [...experience].sort((a, b) => {
+    const parseDate = (dateStr) => {
+      if (!dateStr) return { start: 0, end: 0, isPresent: false }
+      const isPresent = /present/i.test(dateStr)
+      const years = dateStr.match(/\d{4}/g) || []
+      const start = years[0] ? parseInt(years[0], 10) : 0
+      const end = isPresent ? 9999 : (years[1] ? parseInt(years[1], 10) : start)
+      return { start, end, isPresent }
+    }
+    
+    const aDate = parseDate(a.dates)
+    const bDate = parseDate(b.dates)
+    
+    if (aDate.isPresent && !bDate.isPresent) return -1
+    if (!aDate.isPresent && bDate.isPresent) return 1
+    if (aDate.isPresent && bDate.isPresent) return bDate.start - aDate.start
+    if (bDate.end !== aDate.end) return bDate.end - aDate.end
+    return bDate.start - aDate.start
+  })
+}
+
 const BATCH_TAILOR_SYSTEM_PROMPT = `You are an expert at tailoring resumes for specific job descriptions. Your job is to take a primary 1-page resume and customize it for a specific job posting.
 
 TAILORING RULES:
@@ -103,6 +131,11 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
           const jsonMatch = response.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             const tailoredData = JSON.parse(jsonMatch[0])
+            
+            // CRITICAL: Sort experience in reverse chronological order (Present first)
+            if (tailoredData.experience) {
+              tailoredData.experience = sortExperienceChronologically(tailoredData.experience)
+            }
 
             // Extract job title from description
             const jobTitle = extractJobTitle(job.description)
