@@ -210,9 +210,6 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const [error, setError] = useState('')
   const [contactForm, setContactForm] = useState({ phone: '', email: '', linkedin: '' })
   const [pageFill, setPageFill] = useState(null)
-  const [showTrimModal, setShowTrimModal] = useState(false)
-  const [linesOver, setLinesOver] = useState('')
-  const [isTrimming, setIsTrimming] = useState(false)
 
   // Measure page fill when resume changes
   useEffect(() => {
@@ -299,54 +296,6 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     }
   }
 
-  // Handle trimming overflow content
-  const handleTrimOverflow = async () => {
-    if (!linesOver || !rewrittenResume) return
-    
-    const lines = parseInt(linesOver, 10)
-    if (isNaN(lines) || lines <= 0) {
-      setError('Please enter a valid number of lines')
-      return
-    }
-
-    setIsTrimming(true)
-    setError('')
-    setShowTrimModal(false)
-
-    try {
-      // Calculate estimates for the prompt
-      const bulletsToRemove = Math.ceil(lines / 1.5)
-      const bulletsToShorten = Math.ceil(lines * 1.5)
-      
-      const systemPrompt = TRIM_PROMPT
-        .replace(/{LINES_OVER}/g, lines.toString())
-        .replace('{BULLETS_TO_REMOVE}', bulletsToRemove.toString())
-        .replace('{BULLETS_TO_SHORTEN}', bulletsToShorten.toString())
-
-      const userMessage = `Here is the resume that needs to be trimmed by approximately ${lines} lines:
-
-${JSON.stringify(rewrittenResume, null, 2)}
-
-Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
-
-      const response = await callClaude(null, [{ role: 'user', content: userMessage }], systemPrompt)
-
-      // Parse response
-      const jsonMatch = response.match(/\{[\s\S]*"name"[\s\S]*\}/)
-      if (jsonMatch) {
-        const trimmedData = JSON.parse(jsonMatch[0])
-        setRewrittenResume(trimmedData)
-        setImprovements(`Trimmed ~${lines} lines: ${trimmedData.improvements || 'Content condensed to fit 1 page'}`)
-        setLinesOver('')
-      } else {
-        throw new Error('Could not parse trimmed resume')
-      }
-    } catch (err) {
-      setError(`Error trimming resume: ${err.message}`)
-    } finally {
-      setIsTrimming(false)
-    }
-  }
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0]
@@ -430,18 +379,59 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
           experience: sortExperienceChronologically(result.data.experience)
         }
         
-        setRewrittenResume(sortedData)
+        // AUTO-TRIM: Check if resume will overflow, if so automatically trim it
+        let finalResumeData = sortedData
+        const pageFill = measurePageFill(sortedData)
+        
+        if (pageFill.fillPercent > 95) {
+          console.log(`📏 Resume at ${pageFill.fillPercent}% - auto-trimming to prevent overflow...`)
+          
+          // Calculate how much to trim
+          const overflowPercent = Math.max(pageFill.fillPercent - 90, 5) // Target 90% fill
+          const linesToTrim = Math.ceil(overflowPercent / 2)
+          
+          try {
+            // Automatically trim using AI
+            const trimPrompt = TRIM_PROMPT
+              .replace(/{LINES_OVER}/g, linesToTrim.toString())
+              .replace('{BULLETS_TO_REMOVE}', Math.ceil(linesToTrim / 1.5).toString())
+              .replace('{BULLETS_TO_SHORTEN}', Math.ceil(linesToTrim * 1.5).toString())
+
+            const trimMessage = `Here is the resume that needs to be trimmed by approximately ${linesToTrim} lines:
+
+${JSON.stringify(sortedData, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+            const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+            
+            const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+            if (trimMatch) {
+              const trimmedData = JSON.parse(trimMatch[0])
+              finalResumeData = {
+                ...trimmedData,
+                experience: sortExperienceChronologically(trimmedData.experience)
+              }
+              console.log(`✅ Auto-trim successful - removed ~${linesToTrim} lines`)
+            }
+          } catch (trimErr) {
+            console.error('Auto-trim failed:', trimErr)
+            // Continue with original data if trim fails
+          }
+        }
+        
+        setRewrittenResume(finalResumeData)
         setImprovements(result.improvements || 'Resume rewritten successfully!')
 
         // CRITICAL: Populate Prime Resume with ALL bullets from this upload
-        // This ensures tailored resumes can access bullets that didn't fit on the 1-page primary resume
+        // Use the ORIGINAL sortedData (before trimming) to preserve all bullets
         populatePrimeResume(sortedData).catch(err => {
           console.error('Failed to populate Prime Resume:', err)
           // Continue anyway - don't block the upload flow
         })
 
         // Check if contact info is missing (phone or email are essential)
-        const contact = result.data.contact || {}
+        const contact = finalResumeData.contact || {}
         const missingContact = !contact.phone || !contact.email
         if (missingContact) {
           // Pre-fill form with any existing values
@@ -453,7 +443,7 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
           setShowContactPrompter(true)
         } else {
           // Check if resume has [ADD METRIC] placeholders
-          const hasMetrics = JSON.stringify(result.data).includes('[ADD METRIC]')
+          const hasMetrics = JSON.stringify(finalResumeData).includes('[ADD METRIC]')
           if (hasMetrics) {
             setShowMetricPrompter(true)
           }
@@ -473,18 +463,13 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
       // Generate filename from user's name: LASTNAME_FIRSTNAME_RESUME.docx
       await generateDOCX(rewrittenResume, null, null) // null params let docxGenerator auto-generate filename
     } catch (err) {
-      // Handle overflow error by prompting user to trim content
+      // Handle overflow error
       if (err.code === 'RESUME_OVERFLOW') {
-        const linesToRemove = Math.ceil(err.overflowPercent / 2)
         setError(`🚨 RESUME TOO LONG: Your resume is ${err.fillPercent}% filled (95%+ = overflow risk). 
         
 ❌ Cannot generate 2-page document - CBS requires 1 page maximum.
 
-✂️ Use "Fix Overflow" below to automatically remove ~${linesToRemove} lines of content.
-
-The AI will intelligently trim older/less impactful bullets while preserving your best achievements.`)
-        setShowTrimModal(true)
-        setLinesOver(linesToRemove.toString())
+⚠️ This resume was already auto-trimmed but still exceeds 1 page. Please manually edit the content above to remove approximately ${Math.ceil(err.overflowPercent / 2)} more lines, then try downloading again.`)
       } else {
         setError(`Error generating document: ${err.message}`)
       }
@@ -498,14 +483,11 @@ The AI will intelligently trim older/less impactful bullets while preserving you
       // If no error thrown, save the resume
       onResumeComplete(rewrittenResume)
     } catch (err) {
-      // Handle overflow error by blocking save and prompting trim
+      // Handle overflow error by blocking save
       if (err.code === 'RESUME_OVERFLOW') {
-        const linesToRemove = Math.ceil(err.overflowPercent / 2)
         setError(`🚨 CANNOT SAVE: Resume is ${err.fillPercent}% filled (exceeds 1-page limit).
 
-Use "Fix Overflow" below to automatically trim ~${linesToRemove} lines before saving.`)
-        setShowTrimModal(true)
-        setLinesOver(linesToRemove.toString())
+⚠️ This resume was already auto-trimmed but still exceeds 1 page. Please manually edit the content above to remove approximately ${Math.ceil(err.overflowPercent / 2)} more lines, then try saving again.`)
       } else {
         setError(`Error validating resume: ${err.message}`)
       }
@@ -905,103 +887,6 @@ Use "Fix Overflow" below to automatically trim ~${linesToRemove} lines before sa
                 }}>
                   {pageFill.message}
                 </p>
-                {(pageFill.status === 'overflow' || pageFill.status === 'tight') && (
-                  <button
-                    onClick={() => setShowTrimModal(true)}
-                    style={{
-                      fontSize: '13px',
-                      padding: '4px 12px',
-                      background: 'var(--accent-purple)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: '500'
-                    }}
-                  >
-                    ✂️ Fix Overflow
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Trim Modal */}
-          {showTrimModal && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000
-            }}>
-              <div className="card" style={{ 
-                maxWidth: '400px', 
-                width: '90%', 
-                padding: '24px',
-                background: 'white',
-                borderRadius: '16px',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-              }}>
-                <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>✂️ Trim to Fit 1 Page</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
-                  Download the resume, open in Word, and count how many lines it overflows. 
-                  May will intelligently trim content to fit.
-                </p>
-                
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ 
-                    display: 'block', 
-                    fontSize: '13px', 
-                    fontWeight: '600', 
-                    marginBottom: '6px',
-                    color: 'var(--text-secondary)'
-                  }}>
-                    How many lines over 1 page?
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={linesOver}
-                    onChange={(e) => setLinesOver(e.target.value)}
-                    placeholder="e.g., 3"
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      fontSize: '16px',
-                      border: '2px solid var(--border-color)',
-                      borderRadius: '8px',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = 'var(--accent-purple)'}
-                    onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
-                  />
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    Tip: Each bullet is roughly 1-2 lines. 3 lines over ≈ trim 2 bullets.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                  <button 
-                    className="btn btn-ghost"
-                    onClick={() => { setShowTrimModal(false); setLinesOver(''); }}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    className="btn btn-primary"
-                    onClick={handleTrimOverflow}
-                    disabled={!linesOver || isTrimming}
-                  >
-                    {isTrimming ? 'Trimming...' : 'Trim Resume'}
-                  </button>
-                </div>
               </div>
             </div>
           )}

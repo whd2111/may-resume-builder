@@ -124,7 +124,7 @@ export const LAYOUT_BOUNDS = {
     max: 400,          // 20pt - increased for sparse resumes
     step: 20,          // 1pt increments
     default_cozy: 240, // 12pt
-    default_compact: 120, // 6pt
+    default_compact: 160, // 8pt - increased for better CBS appearance
   },
   
   // Section spacing after (in TWIPs)
@@ -133,7 +133,7 @@ export const LAYOUT_BOUNDS = {
     max: 200,          // 10pt - increased for sparse resumes
     step: 20,          // 1pt increments
     default_cozy: 100, // 5pt
-    default_compact: 40, // 2pt
+    default_compact: 60, // 3pt - increased for better spacing
   },
   
   // Role/entry gap (in TWIPs)
@@ -142,7 +142,7 @@ export const LAYOUT_BOUNDS = {
     max: 360,          // 18pt - increased for sparse resumes
     step: 20,          // 1pt increments
     default_cozy: 200, // 10pt
-    default_compact: 80, // 4pt
+    default_compact: 120, // 6pt - increased for better separation between roles
   },
   
   // Bullet spacing after (in TWIPs)
@@ -151,7 +151,7 @@ export const LAYOUT_BOUNDS = {
     max: 120,          // 6pt - increased for sparse resumes
     step: 20,          // 1pt increments
     default_cozy: 60,  // 3pt
-    default_compact: 0, // 0pt
+    default_compact: 20, // 1pt - minimum spacing for readability
   },
   
   // Contact info spacing after (in TWIPs)
