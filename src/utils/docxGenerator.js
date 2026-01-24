@@ -513,16 +513,23 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   layout = pageFitResult.layout
   
   // CRITICAL: Prevent 2-page overflow by blocking document generation
-  // HTML measurement underestimates DOCX height - must be very conservative
-  // Add 10% safety margin to account for DOCX rendering differences
+  // HTML measurement underestimates DOCX height - use adaptive safety margin
+  // Higher fills (95%+) need less margin since PageFit already compressed aggressively
   const finalHeight = measureResumeHeightWithVars(cleanedData, pageFitResult.layout._layoutVars)
   const finalLimit = getContentLimitPx(pageFitResult.layout._layoutVars.margins)
   const htmlFillPercent = (finalHeight / finalLimit) * 100
-  const estimatedDocxFill = htmlFillPercent * 1.10 // Add 10% safety margin for DOCX rendering
   
-  console.log(`📏 HTML measurement: ${Math.round(htmlFillPercent)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
+  // Adaptive safety margin: high fills are more accurate
+  // 95%+ HTML → use 7% margin (tight compression already applied)
+  // <95% HTML → use 10% margin (more room for error)
+  const safetyMargin = htmlFillPercent >= 95 ? 1.07 : 1.10
+  const estimatedDocxFill = htmlFillPercent * safetyMargin
   
-  if (pageFitResult.overflow || estimatedDocxFill >= 95) {
+  console.log(`📏 HTML: ${Math.round(htmlFillPercent)}%, Safety margin: ${Math.round((safetyMargin - 1) * 100)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
+  
+  // Allow 1-2 lines of overflow tolerance (up to 102% estimated)
+  // PageFit has already compressed to CBS minimums, minor overflow is acceptable
+  if (pageFitResult.overflow || estimatedDocxFill >= 102) {
     const overflowAmount = pageFitResult.overflow 
       ? pageFitResult.overflowPercent 
       : Math.round(estimatedDocxFill - 100)
