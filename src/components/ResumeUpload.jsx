@@ -541,13 +541,19 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
     
     try {
       console.log('📥 Download button clicked, generating DOCX...')
-      console.log('Resume data:', JSON.stringify(rewrittenResume, null, 2))
+      console.log('Resume data preview:', {
+        name: rewrittenResume.name,
+        experienceCount: rewrittenResume.experience?.length,
+        educationCount: rewrittenResume.education?.length
+      })
       
       // Try to generate document
+      console.log('🚀 Calling generateDOCX...')
       await generateDOCX(rewrittenResume, null, null)
-      console.log('✅ Download completed successfully')
+      console.log('✅ generateDOCX completed, download should have triggered')
     } catch (err) {
-      console.error('❌ Download error:', err)
+      console.error('❌ Download error caught:', err)
+      console.error('Error stack:', err.stack)
       // If overflow, try auto-trimming once more
       if (err.code === 'RESUME_OVERFLOW') {
         console.log(`📏 Download overflow - attempting additional trim...`)

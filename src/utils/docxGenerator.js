@@ -685,8 +685,22 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   console.log(`✅ Document generated with ${layout._mode} layout (margins: ${layout.MARGIN} TWIPs, body font: ${layout.FONT_SIZE.BODY/2}pt)`)
 
   // Generate and save
-  const blob = await Packer.toBlob(doc)
-  saveAs(blob, filename)
+  console.log(`📦 Creating blob for file: ${filename}`)
+  try {
+    const blob = await Packer.toBlob(doc)
+    console.log(`📦 Blob created, size: ${blob.size} bytes, type: ${blob.type}`)
+    console.log(`💾 Triggering download with saveAs: ${filename}`)
+    
+    // Trigger download
+    saveAs(blob, filename)
+    
+    // Give browser a moment to trigger download
+    await new Promise(resolve => setTimeout(resolve, 100))
+    console.log(`✅ saveAs completed, download should have started`)
+  } catch (saveError) {
+    console.error('❌ Error during blob creation or saveAs:', saveError)
+    throw saveError
+  }
 }
 
 // ============================================
