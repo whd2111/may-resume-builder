@@ -4,6 +4,26 @@ import { generateDOCX } from '../utils/docxGenerator'
 import { ArrowLeftIcon, WritingIcon, TargetIcon, DownloadIcon, CheckIcon } from '../utils/icons'
 import { useApplications } from '../hooks/useApplications'
 
+// Prompt for trimming overflow content
+const TRIM_PROMPT = `You are May, an expert resume editor. The user's resume is currently OVER 1 PAGE and needs to be trimmed.
+
+YOUR TASK: Trim the resume to fit on exactly 1 page by removing approximately {LINES_OVER} lines worth of content.
+
+TRIMMING RULES (in priority order):
+1. FIRST: Shorten verbose bullets - tighten language, remove filler words
+2. SECOND: Remove the LEAST impactful bullets from roles with 5+ bullets (keep min 2-3 per role)
+3. THIRD: Combine similar bullets if possible
+4. FOURTH: Trim older/less relevant experience more aggressively than recent experience
+5. NEVER remove entire jobs or education entries
+6. NEVER fabricate or change factual information
+7. Preserve the most impressive metrics and achievements
+
+ESTIMATE: Each bullet point is roughly 1-2 lines. To remove {LINES_OVER} lines, you may need to:
+- Remove {BULLETS_TO_REMOVE} bullet points, OR
+- Significantly shorten {BULLETS_TO_SHORTEN} bullets
+
+Return the trimmed resume in the EXACT same JSON format as the input, with an "improvements" field describing what was trimmed.`;
+
 /**
  * Sort experience array in reverse chronological order
  * Present jobs come first, then sorted by end year descending
@@ -140,12 +160,63 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
             // Extract job title from description
             const jobTitle = extractJobTitle(job.description)
 
-            // Download if requested
-            if (saveOption === 'download' || saveOption === 'both') {
-              await generateDOCX(tailoredData, null, companyName)
+            // Try to generate document - if overflow, auto-trim and retry
+            let finalTailoredData = tailoredData
+            
+            try {
+              // Download if requested
+              if (saveOption === 'download' || saveOption === 'both') {
+                await generateDOCX(finalTailoredData, null, companyName)
+              }
+            } catch (docError) {
+              // If overflow, auto-trim and retry once
+              if (docError.code === 'RESUME_OVERFLOW') {
+                console.log(`📏 Overflow detected for ${companyName} - auto-trimming...`)
+                
+                try {
+                  // Calculate trim amount
+                  const linesToTrim = Math.ceil(docError.overflowPercent / 2)
+                  
+                  const trimPrompt = TRIM_PROMPT
+                    .replace(/{LINES_OVER}/g, linesToTrim.toString())
+                    .replace('{BULLETS_TO_REMOVE}', Math.ceil(linesToTrim / 1.5).toString())
+                    .replace('{BULLETS_TO_SHORTEN}', Math.ceil(linesToTrim * 1.5).toString())
+
+                  const trimMessage = `Here is the resume that needs to be trimmed by approximately ${linesToTrim} lines:
+
+${JSON.stringify(tailoredData, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+                  const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+                  
+                  const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+                  if (trimMatch) {
+                    const trimmedData = JSON.parse(trimMatch[0])
+                    finalTailoredData = {
+                      ...trimmedData,
+                      experience: sortExperienceChronologically(trimmedData.experience)
+                    }
+                    
+                    // Retry document generation with trimmed data
+                    if (saveOption === 'download' || saveOption === 'both') {
+                      await generateDOCX(finalTailoredData, null, companyName)
+                    }
+                    
+                    console.log(`✅ Auto-trim successful for ${companyName}`)
+                  } else {
+                    throw new Error('Auto-trim failed - could not parse trimmed resume')
+                  }
+                } catch (trimError) {
+                  // If trim fails or still overflows, throw original error
+                  throw docError
+                }
+              } else {
+                throw docError
+              }
             }
 
-            // Save to database if requested
+            // Save to database if requested (use finalTailoredData which may be trimmed)
             if (saveOption === 'save' || saveOption === 'both') {
               await createApplication({
                 job_description: job.description,
@@ -154,7 +225,7 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
                 checklist_json: null,
                 selection_json: null,
                 resume_id: null,
-                tailored_resume_data: tailoredData,
+                tailored_resume_data: finalTailoredData,
                 status: 'tailored',
               })
             }
@@ -163,7 +234,7 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
               company: companyName,
               jobTitle: jobTitle,
               status: 'success',
-              fileName: `${tailoredData.name.split(' ').pop().toUpperCase()}_${tailoredData.name.split(' ')[0].toUpperCase()}_${companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')}.docx`
+              fileName: `${finalTailoredData.name.split(' ').pop().toUpperCase()}_${finalTailoredData.name.split(' ')[0].toUpperCase()}_${companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')}.docx`
             })
           } else {
             throw new Error('Could not parse tailored resume')
@@ -172,7 +243,7 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
           // Provide specific error message for overflow
           let errorMsg = err.message
           if (err.code === 'RESUME_OVERFLOW') {
-            errorMsg = `Content too long by ${err.overflowPercent}% - exceeded 1-page limit even at minimum layout (10pt, 0.5" margins)`
+            errorMsg = `Content too long by ${err.overflowPercent}% - auto-trim failed, still exceeds 1-page limit`
           }
           
           tailoredResumes.push({

@@ -12,6 +12,26 @@ import { usePrimeBullets } from '../hooks/usePrimeBullets'
 import { primeBulletsToResumeJson } from '../utils/primeResumeAdapter'
 import { useResumes } from '../hooks/useResumes'
 
+// Prompt for trimming overflow content
+const TRIM_PROMPT = `You are May, an expert resume editor. The user's resume is currently OVER 1 PAGE and needs to be trimmed.
+
+YOUR TASK: Trim the resume to fit on exactly 1 page by removing approximately {LINES_OVER} lines worth of content.
+
+TRIMMING RULES (in priority order):
+1. FIRST: Shorten verbose bullets - tighten language, remove filler words
+2. SECOND: Remove the LEAST impactful bullets from roles with 5+ bullets (keep min 2-3 per role)
+3. THIRD: Combine similar bullets if possible
+4. FOURTH: Trim older/less relevant experience more aggressively than recent experience
+5. NEVER remove entire jobs or education entries
+6. NEVER fabricate or change factual information
+7. Preserve the most impressive metrics and achievements
+
+ESTIMATE: Each bullet point is roughly 1-2 lines. To remove {LINES_OVER} lines, you may need to:
+- Remove {BULLETS_TO_REMOVE} bullet points, OR
+- Significantly shorten {BULLETS_TO_SHORTEN} bullets
+
+Return the trimmed resume in the EXACT same JSON format as the input, with an "improvements" field describing what was trimmed.`;
+
 /**
  * Sort experience array in reverse chronological order
  * Present jobs come first, then sorted by end year descending
@@ -302,11 +322,56 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       // Use company name from checklist if available
       const companyName = checklist?.job_metadata?.company_name || 'TAILORED'
       
-      await generateDOCX(tailoredResume, null, companyName)
-      alert('Resume downloaded successfully!')
+      // Try to generate - if overflow, auto-trim and retry
+      try {
+        await generateDOCX(tailoredResume, null, companyName)
+        alert('Resume downloaded successfully!')
+      } catch (docError) {
+        // If overflow, auto-trim and retry once
+        if (docError.code === 'RESUME_OVERFLOW') {
+          console.log(`📏 Overflow detected - auto-trimming tailored resume...`)
+          
+          // Calculate trim amount
+          const linesToTrim = Math.ceil(docError.overflowPercent / 2)
+          
+          const trimPrompt = TRIM_PROMPT
+            .replace(/{LINES_OVER}/g, linesToTrim.toString())
+            .replace('{BULLETS_TO_REMOVE}', Math.ceil(linesToTrim / 1.5).toString())
+            .replace('{BULLETS_TO_SHORTEN}', Math.ceil(linesToTrim * 1.5).toString())
+
+          const trimMessage = `Here is the resume that needs to be trimmed by approximately ${linesToTrim} lines:
+
+${JSON.stringify(tailoredResume, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+          const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+          
+          const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+          if (trimMatch) {
+            const trimmedData = JSON.parse(trimMatch[0])
+            const sortedTrimmed = {
+              ...trimmedData,
+              experience: sortExperienceChronologically(trimmedData.experience)
+            }
+            
+            // Update state with trimmed version
+            setTailoredResume(sortedTrimmed)
+            
+            // Retry document generation
+            await generateDOCX(sortedTrimmed, null, companyName)
+            alert('Resume auto-trimmed and downloaded successfully!')
+            console.log(`✅ Auto-trim successful`)
+          } else {
+            throw new Error('Auto-trim failed - could not parse trimmed resume')
+          }
+        } else {
+          throw docError
+        }
+      }
     } catch (error) {
       if (error.code === 'RESUME_OVERFLOW') {
-        alert(`❌ Resume is ${error.overflowPercent}% too long to fit on 1 page.\n\nLayout compression reached CBS limits (10pt font, 0.5" margins).\n\nPlease manually remove ~${Math.ceil(error.overflowPercent / 2)} lines of content and try again.`)
+        alert(`❌ Resume is ${error.overflowPercent}% too long to fit on 1 page.\n\nAuto-trim attempted but still exceeds limit.\n\nPlease manually edit to remove ~${Math.ceil(error.overflowPercent / 2)} more lines.`)
       } else {
         alert(`Error generating document: ${error.message}`)
       }
