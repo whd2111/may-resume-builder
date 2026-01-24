@@ -626,7 +626,14 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
                     <DownloadIcon />
                   </span>
                 ) : (
-                  <span style={{ color: '#ef4444' }}>Error</span>
+                  <span style={{ 
+                    color: '#ef4444', 
+                    fontSize: '13px',
+                    maxWidth: '60%',
+                    textAlign: 'right'
+                  }}>
+                    {result.error || 'Error'}
+                  </span>
                 )}
               </div>
             ))}
