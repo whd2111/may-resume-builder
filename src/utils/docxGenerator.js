@@ -513,22 +513,25 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   layout = pageFitResult.layout
   
   // CRITICAL: Prevent 2-page overflow by blocking document generation
-  // Apply conservative threshold: HTML measurement ≠ DOCX rendering
-  // 95-97% is IDEAL fill zone - only block if genuinely at risk (98%+)
+  // HTML measurement underestimates DOCX height - must be very conservative
+  // Add 10% safety margin to account for DOCX rendering differences
   const finalHeight = measureResumeHeightWithVars(cleanedData, pageFitResult.layout._layoutVars)
   const finalLimit = getContentLimitPx(pageFitResult.layout._layoutVars.margins)
-  const actualFillPercent = (finalHeight / finalLimit) * 100
+  const htmlFillPercent = (finalHeight / finalLimit) * 100
+  const estimatedDocxFill = htmlFillPercent * 1.10 // Add 10% safety margin for DOCX rendering
   
-  if (pageFitResult.overflow || actualFillPercent >= 98) {
+  console.log(`📏 HTML measurement: ${Math.round(htmlFillPercent)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
+  
+  if (pageFitResult.overflow || estimatedDocxFill >= 95) {
     const overflowAmount = pageFitResult.overflow 
       ? pageFitResult.overflowPercent 
-      : Math.round(actualFillPercent - 100)
+      : Math.round(estimatedDocxFill - 100)
     
-    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(actualFillPercent)}% filled (98%+ threshold)`)
+    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (95%+ threshold with safety margin)`)
     
-    const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(actualFillPercent)}% filled). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
+    const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(htmlFillPercent)}% HTML, ~${Math.round(estimatedDocxFill)}% DOCX estimated). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
     error.overflowPercent = Math.max(overflowAmount, 5) // Minimum 5% reported
-    error.fillPercent = Math.round(actualFillPercent)
+    error.fillPercent = Math.round(estimatedDocxFill)
     error.code = 'RESUME_OVERFLOW'
     throw error
   }
@@ -912,19 +915,32 @@ function generateCustomSections(customSections, layout) {
   const elements = []
 
   customSections.forEach((section) => {
+    // Skip sections with no content or empty content arrays
+    if (!section.content || section.content.length === 0) {
+      console.log(`⏭️ Skipping empty custom section: ${section.title}`)
+      return
+    }
+    
+    // Filter out empty strings from content
+    const validContent = section.content.filter(item => item && item.trim().length > 0)
+    if (validContent.length === 0) {
+      console.log(`⏭️ Skipping custom section with only empty content: ${section.title}`)
+      return
+    }
+    
     elements.push(createSectionHeader(section.title, layout))
 
-    if (section.content && section.content.length > 0) {
+    if (validContent.length > 0) {
       // Check if entries are short enough for single-line formatting
-      const isCompactSection = section.content.every(item => item.length < 80)
+      const isCompactSection = validContent.every(item => item.length < 80)
       
-      if (isCompactSection && section.content.length <= 4) {
+      if (isCompactSection && validContent.length <= 4) {
         // Single-line format: join with semicolons or bullets inline
         elements.push(
           new Paragraph({
             children: [
               new TextRun({
-                text: section.content.join(' • '),
+                text: validContent.join(' • '),
                 size: layout.FONT_SIZE.BODY,
                 font: FONT_FAMILY
               })
@@ -934,8 +950,8 @@ function generateCustomSections(customSections, layout) {
         )
       } else {
         // Standard bullet format with tight spacing
-        section.content.forEach((item, itemIndex) => {
-          const isLastItem = itemIndex === section.content.length - 1
+        validContent.forEach((item, itemIndex) => {
+          const isLastItem = itemIndex === validContent.length - 1
           elements.push(createBulletParagraph(item, layout, isLastItem))
         })
       }

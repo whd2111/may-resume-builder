@@ -436,12 +436,14 @@ Please trim this resume to fit on 1 page more comfortably. Return ONLY the JSON 
         let finalResumeData = sortedData
         const pageFill = measurePageFill(sortedData)
         
-        // 95-97% is ideal fill zone - only auto-trim if genuinely at risk (98%+)
-        if (pageFill.fillPercent >= 98) {
-          console.log(`📏 Resume at ${pageFill.fillPercent}% - auto-trimming to prevent overflow...`)
+        // HTML measurement underestimates DOCX - use 10% safety margin
+        // 87%+ HTML = ~95%+ DOCX, trigger auto-trim
+        const estimatedDocxFill = pageFill.fillPercent * 1.10
+        if (estimatedDocxFill >= 95) {
+          console.log(`📏 Resume at ${pageFill.fillPercent}% HTML (~${Math.round(estimatedDocxFill)}% DOCX) - auto-trimming to prevent overflow...`)
           
           // Calculate how much to trim
-          const overflowPercent = Math.max(pageFill.fillPercent - 93, 5) // Target 93% fill after trim
+          const overflowPercent = Math.max(estimatedDocxFill - 90, 5) // Target 90% DOCX fill after trim
           const linesToTrim = Math.ceil(overflowPercent / 2)
           
           try {
