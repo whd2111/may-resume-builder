@@ -514,17 +514,17 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   
   // CRITICAL: Prevent 2-page overflow by blocking document generation
   // Apply conservative threshold: HTML measurement ≠ DOCX rendering
-  // If HTML shows >95% full, DOCX will likely overflow to 2 pages
+  // 95-97% is IDEAL fill zone - only block if genuinely at risk (98%+)
   const finalHeight = measureResumeHeightWithVars(cleanedData, pageFitResult.layout._layoutVars)
   const finalLimit = getContentLimitPx(pageFitResult.layout._layoutVars.margins)
   const actualFillPercent = (finalHeight / finalLimit) * 100
   
-  if (pageFitResult.overflow || actualFillPercent > 95) {
+  if (pageFitResult.overflow || actualFillPercent >= 98) {
     const overflowAmount = pageFitResult.overflow 
       ? pageFitResult.overflowPercent 
       : Math.round(actualFillPercent - 100)
     
-    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(actualFillPercent)}% filled (95%+ threshold)`)
+    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(actualFillPercent)}% filled (98%+ threshold)`)
     
     const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(actualFillPercent)}% filled). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
     error.overflowPercent = Math.max(overflowAmount, 5) // Minimum 5% reported
