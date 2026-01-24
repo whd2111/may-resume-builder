@@ -102,12 +102,15 @@ async function runPageFitLoop(resumeData, initialLayout) {
   // If already fits, check if we should expand to fill the page better
   if (height <= contentLimit) {
     const fillPercent = (height / contentLimit) * 100
-    // If less than 95% filled, try expanding layout to use more space
-    // We want resumes to fill the page well, not have lots of white space
-    if (fillPercent < 95) {
-      console.log(`📏 Underfull (${Math.round(fillPercent)}%), expanding layout to fill page...`)
+    // CONSERVATIVE: Only expand if <85% filled (very sparse)
+    // Target range is 85-90% - this leaves 1-2 lines of white space as buffer
+    // Better to have breathing room than risk overflow after DOCX conversion
+    if (fillPercent < 85) {
+      console.log(`📏 Very sparse (${Math.round(fillPercent)}%), expanding layout to improve fill...`)
       layoutVars = expandLayoutIteratively(layoutVars, height, contentLimit, resumeData)
       layout = getAdaptiveLayout(resumeData, layoutVars)
+    } else {
+      console.log(`📏 Good fill already (${Math.round(fillPercent)}%), no expansion needed`)
     }
     return { layout, overflow: false, overflowPercent: 0 }
   }
@@ -251,9 +254,10 @@ function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resume
     
     console.log(`📏 Expand iteration ${i + 1}: ${Math.round(fillPercent)}% filled`)
     
-    // Target: 93-99% filled - we want to fill the page well!
-    if (fillPercent >= 93 && fillPercent <= 99) {
-      console.log(`✅ Good fill achieved: ${Math.round(fillPercent)}%`)
+    // CONSERVATIVE Target: 85-90% filled - leave breathing room to avoid overflow
+    // Better to have 1-2 lines of white space than risk going to 2 pages
+    if (fillPercent >= 85 && fillPercent <= 90) {
+      console.log(`✅ Good fill achieved: ${Math.round(fillPercent)}% (conservative target)`)
       break
     }
     
@@ -519,30 +523,31 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   const finalLimit = getContentLimitPx(pageFitResult.layout._layoutVars.margins)
   const htmlFillPercent = (finalHeight / finalLimit) * 100
   
-  // Adaptive safety margin: high fills are more accurate
-  // 90%+ HTML → use 5% margin (excellent fills, PageFit already optimized)
-  // 85-90% HTML → use 7% margin (good fills)
-  // <85% HTML → use 10% margin (more room for error)
+  // CONSERVATIVE safety margin: Better to be 1-2 lines SHORT than risk overflow
+  // Aim for 85-90% target, block at 95%+ estimated DOCX
+  // 90%+ HTML → use 8% margin (still aggressive compression, but safer)
+  // 85-90% HTML → use 10% margin 
+  // <85% HTML → use 12% margin (extra conservative for lower fills)
   let safetyMargin
   if (htmlFillPercent >= 90) {
-    safetyMargin = 1.05
+    safetyMargin = 1.08
   } else if (htmlFillPercent >= 85) {
-    safetyMargin = 1.07
-  } else {
     safetyMargin = 1.10
+  } else {
+    safetyMargin = 1.12
   }
   const estimatedDocxFill = htmlFillPercent * safetyMargin
   
   console.log(`📏 HTML: ${Math.round(htmlFillPercent)}%, Safety margin: ${Math.round((safetyMargin - 1) * 100)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
   
-  // Allow 1-2 lines of overflow tolerance (up to 102% estimated)
-  // PageFit has already compressed to CBS minimums, minor overflow is acceptable
-  if (pageFitResult.overflow || estimatedDocxFill >= 102) {
+  // CONSERVATIVE blocking: Block at 98% estimated to ensure 1-2 lines of breathing room
+  // User preference: Better to have white space than risk 2-page overflow
+  if (pageFitResult.overflow || estimatedDocxFill >= 98) {
     const overflowAmount = pageFitResult.overflow 
       ? pageFitResult.overflowPercent 
       : Math.round(estimatedDocxFill - 100)
     
-    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (102%+ threshold with adaptive safety margin)`)
+    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (98%+ conservative threshold - prioritizing white space over overflow)`)
     
     const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(htmlFillPercent)}% HTML, ~${Math.round(estimatedDocxFill)}% DOCX estimated). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
     error.overflowPercent = Math.max(overflowAmount, 5) // Minimum 5% reported
