@@ -210,6 +210,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const [error, setError] = useState('')
   const [contactForm, setContactForm] = useState({ phone: '', email: '', linkedin: '' })
   const [pageFill, setPageFill] = useState(null)
+  const [isManualTrimming, setIsManualTrimming] = useState(false)
 
   // Measure page fill when resume changes
   useEffect(() => {
@@ -296,6 +297,52 @@ function ResumeUpload({ onResumeComplete, onBack }) {
     }
   }
 
+  // Manual trim function for users who want to condense their resume further
+  const handleManualTrim = async () => {
+    if (!rewrittenResume) return
+    
+    setIsManualTrimming(true)
+    setError('')
+    
+    try {
+      // Calculate reasonable trim amount (aim to reduce by ~10-15%)
+      const currentFill = measurePageFill(rewrittenResume)
+      const targetReduction = Math.max(Math.ceil((currentFill.fillPercent - 80) / 2), 3) // At least 3 lines
+      
+      console.log(`📝 Manual trim requested - removing ~${targetReduction} lines...`)
+      
+      const trimPrompt = TRIM_PROMPT
+        .replace(/{LINES_OVER}/g, targetReduction.toString())
+        .replace('{BULLETS_TO_REMOVE}', Math.ceil(targetReduction / 1.5).toString())
+        .replace('{BULLETS_TO_SHORTEN}', Math.ceil(targetReduction * 1.5).toString())
+
+      const trimMessage = `Here is the resume that needs to be trimmed by approximately ${targetReduction} lines:
+
+${JSON.stringify(rewrittenResume, null, 2)}
+
+Please trim this resume to fit on 1 page more comfortably. Return ONLY the JSON object with the trimmed resume data.`
+
+      const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+      
+      const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+      if (trimMatch) {
+        const trimmedData = JSON.parse(trimMatch[0])
+        const sortedTrimmed = {
+          ...trimmedData,
+          experience: sortExperienceChronologically(trimmedData.experience)
+        }
+        setRewrittenResume(sortedTrimmed)
+        setImprovements(`Manually trimmed: removed ~${targetReduction} lines to optimize page fit`)
+        console.log(`✅ Manual trim successful`)
+      } else {
+        throw new Error('Could not parse trimmed resume')
+      }
+    } catch (err) {
+      setError(`Error trimming resume: ${err.message}`)
+    } finally {
+      setIsManualTrimming(false)
+    }
+  }
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0]
@@ -970,6 +1017,19 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
             <button className="btn btn-secondary" onClick={handleStartOver}>
               Upload Another
             </button>
+            {pageFill && pageFill.fillPercent > 60 && (
+              <button 
+                className="btn btn-secondary" 
+                onClick={handleManualTrim}
+                disabled={isManualTrimming}
+                style={{
+                  background: 'var(--accent-purple)',
+                  color: 'white'
+                }}
+              >
+                {isManualTrimming ? '✂️ Trimming...' : '✂️ Trim Resume'}
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={handleDownload}>
               <DownloadIcon />
               Download DOCX
