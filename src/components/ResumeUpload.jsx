@@ -22,6 +22,16 @@ CBS RESUME STANDARDS:
 4. Use Times New Roman, 10-12pt font (output as 10pt by default)
 5. Margins: 0.5 to 0.75 inches
 
+CRITICAL 1-PAGE SPACE BUDGET:
+- You have approximately 400-450 words MAXIMUM for the entire resume (including ALL sections)
+- Experience section should be ~250-300 words maximum
+- Each bullet should be 15-25 words (1-1.5 lines when rendered)
+- If the resume has 5+ jobs, you MUST be ruthless about brevity
+- Older roles (5+ years ago): 1-2 bullets MAXIMUM
+- Recent/relevant roles (last 3 years): 3-5 bullets maximum
+- BE AGGRESSIVE: Cut filler words, combine related ideas, prioritize impact over detail
+- If you must choose between more roles or more bullets, choose more roles with fewer bullets each
+
 BULLET POINT RULES:
 - Two to six bullets per job title
 - One to two lines per bullet; three lines should be avoided if possible
@@ -465,11 +475,16 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
     } catch (err) {
       // Handle overflow error by prompting user to trim content
       if (err.code === 'RESUME_OVERFLOW') {
-        setError(`⚠️ Resume is ${err.overflowPercent}% too long to fit on 1 page. Use "Fix Overflow" below to automatically trim.`)
+        const linesToRemove = Math.ceil(err.overflowPercent / 2)
+        setError(`🚨 RESUME TOO LONG: Your resume is ${err.fillPercent}% filled (95%+ = overflow risk). 
+        
+❌ Cannot generate 2-page document - CBS requires 1 page maximum.
+
+✂️ Use "Fix Overflow" below to automatically remove ~${linesToRemove} lines of content.
+
+The AI will intelligently trim older/less impactful bullets while preserving your best achievements.`)
         setShowTrimModal(true)
-        // Pre-fill with estimated lines based on overflow percentage
-        const estimatedLines = Math.ceil(err.overflowPercent / 2) // rough estimate: 2% = 1 line
-        setLinesOver(estimatedLines.toString())
+        setLinesOver(linesToRemove.toString())
       } else {
         setError(`Error generating document: ${err.message}`)
       }
@@ -485,10 +500,12 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
     } catch (err) {
       // Handle overflow error by blocking save and prompting trim
       if (err.code === 'RESUME_OVERFLOW') {
-        setError(`❌ Cannot save: Resume is ${err.overflowPercent}% too long for 1 page. Use "Fix Overflow" to trim first.`)
+        const linesToRemove = Math.ceil(err.overflowPercent / 2)
+        setError(`🚨 CANNOT SAVE: Resume is ${err.fillPercent}% filled (exceeds 1-page limit).
+
+Use "Fix Overflow" below to automatically trim ~${linesToRemove} lines before saving.`)
         setShowTrimModal(true)
-        const estimatedLines = Math.ceil(err.overflowPercent / 2)
-        setLinesOver(estimatedLines.toString())
+        setLinesOver(linesToRemove.toString())
       } else {
         setError(`Error validating resume: ${err.message}`)
       }

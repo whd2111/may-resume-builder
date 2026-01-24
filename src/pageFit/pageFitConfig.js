@@ -44,9 +44,10 @@ export const PAGE_SPEC = {
 // Character count thresholds for determining layout density mode
 export const DENSITY_THRESHOLDS = {
   // Below this: use "cozy" mode (larger fonts, more spacing)
-  // CRITICAL: Lowered from 3000 to 2000 to prevent 2-page overflow
-  // Most MBA resumes are 2000-2500 chars, should start compact
-  SPARSE_MAX: 2000,
+  // CRITICAL: Lowered from 3000 → 2000 → 1500 to prevent 2-page overflow
+  // ULTRA CONSERVATIVE: Start compact for almost all professional resumes
+  // Only student resumes (<1500 chars) get cozy mode
+  SPARSE_MAX: 1500,
   // Above sparse max: use "compact" mode (tighter layout)
 }
 
