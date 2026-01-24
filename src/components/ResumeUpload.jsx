@@ -5,6 +5,8 @@ import mammoth from 'mammoth'
 import * as pdfjsLib from 'pdfjs-dist'
 import MetricPrompter from './MetricPrompter'
 import { ArrowLeftIcon, DownloadIcon, WritingIcon } from '../utils/icons'
+import { usePrimeResume } from '../hooks/usePrimeResume'
+import { usePrimeBullets } from '../hooks/usePrimeBullets'
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
@@ -186,6 +188,9 @@ ESTIMATE: Each bullet point is roughly 1-2 lines. To remove {LINES_OVER} lines, 
 Return the trimmed resume in the EXACT same JSON format as the input, with an "improvements" field describing what was trimmed.`;
 
 function ResumeUpload({ onResumeComplete, onBack }) {
+  const { primeResume, createPrimeResume, updatePrimeResume } = usePrimeResume()
+  const { createBulletsBatch } = usePrimeBullets(primeResume?.id)
+  
   const [file, setFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
@@ -208,6 +213,81 @@ function ResumeUpload({ onResumeComplete, onBack }) {
       setPageFill(null)
     }
   }, [rewrittenResume])
+
+  // Populate Prime Resume with bullets from uploaded resume
+  // This ensures ALL bullets are available for future tailoring, not just the 1-page compressed version
+  const populatePrimeResume = async (resumeData) => {
+    try {
+      console.log('📝 Populating Prime Resume with bullets from uploaded resume...')
+      
+      // Create or get Prime Resume
+      let currentPrimeResume = primeResume
+      if (!currentPrimeResume) {
+        currentPrimeResume = await createPrimeResume({
+          title: 'Prime Resume',
+          summary_json: {
+            name: resumeData.name,
+            contact: resumeData.contact,
+            education: resumeData.education,
+            skills: resumeData.skills,
+            additional: resumeData.additional,
+            custom_sections: resumeData.custom_sections
+          }
+        })
+      } else {
+        // Update summary info
+        await updatePrimeResume(currentPrimeResume.id, {
+          summary_json: {
+            name: resumeData.name,
+            contact: resumeData.contact,
+            education: resumeData.education,
+            skills: resumeData.skills,
+            additional: resumeData.additional,
+            custom_sections: resumeData.custom_sections
+          }
+        })
+      }
+
+      // Extract all bullets from experience and prepare for batch insert
+      const bulletsToInsert = []
+      if (resumeData.experience && Array.isArray(resumeData.experience)) {
+        for (const exp of resumeData.experience) {
+          if (exp.bullets && Array.isArray(exp.bullets)) {
+            const dates = exp.dates || ''
+            const years = dates.match(/\d{4}/g) || []
+            const startDate = years[0] ? `${years[0]}-01-01` : null
+            const endDate = /present/i.test(dates) ? null : (years[1] ? `${years[1]}-01-01` : startDate)
+
+            for (const bullet of exp.bullets) {
+              bulletsToInsert.push({
+                prime_resume_id: currentPrimeResume.id,
+                company: exp.company,
+                role: exp.title,
+                start_date: startDate,
+                end_date: endDate,
+                bullet_text: bullet,
+                source: 'import', // Mark as imported from resume upload
+                tags: [],
+                skills: [],
+                metrics: []
+              })
+            }
+          }
+        }
+      }
+
+      // Batch insert all bullets at once (with automatic deduplication)
+      if (bulletsToInsert.length > 0) {
+        await createBulletsBatch(bulletsToInsert)
+        console.log(`✅ Prime Resume populated with ${bulletsToInsert.length} bullets`)
+      } else {
+        console.log('ℹ️ No bullets to add to Prime Resume')
+      }
+    } catch (error) {
+      console.error('Error populating Prime Resume:', error)
+      // Don't throw - this is a nice-to-have, shouldn't block resume upload
+    }
+  }
 
   // Handle trimming overflow content
   const handleTrimOverflow = async () => {
@@ -342,6 +422,13 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
         
         setRewrittenResume(sortedData)
         setImprovements(result.improvements || 'Resume rewritten successfully!')
+
+        // CRITICAL: Populate Prime Resume with ALL bullets from this upload
+        // This ensures tailored resumes can access bullets that didn't fit on the 1-page primary resume
+        populatePrimeResume(sortedData).catch(err => {
+          console.error('Failed to populate Prime Resume:', err)
+          // Continue anyway - don't block the upload flow
+        })
 
         // Check if contact info is missing (phone or email are essential)
         const contact = result.data.contact || {}
