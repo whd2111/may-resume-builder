@@ -86,7 +86,7 @@ const FONT_FAMILY = 'Times New Roman'
  * 
  * @param {Object} resumeData - Resume content (READ-ONLY)
  * @param {Object} initialLayout - Initial layout configuration
- * @returns {Object} - Optimized layout configuration
+ * @returns {Object} - { layout, overflow, overflowPercent }
  */
 async function runPageFitLoop(resumeData, initialLayout) {
   const maxIterations = 20 // Increased for more aggressive compression
@@ -109,7 +109,7 @@ async function runPageFitLoop(resumeData, initialLayout) {
       layoutVars = expandLayoutIteratively(layoutVars, height, contentLimit, resumeData)
       layout = getAdaptiveLayout(resumeData, layoutVars)
     }
-    return layout
+    return { layout, overflow: false, overflowPercent: 0 }
   }
   
   // Overflow: need to compress layout
@@ -129,8 +129,10 @@ async function runPageFitLoop(resumeData, initialLayout) {
       const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100)
       
       if (overflowPercent > 0) {
-        console.warn(`⚠️ CONTENT STILL OVERFLOWS by ${overflowPercent}% - Resume may exceed 1 page`)
-        console.warn(`⚠️ Consider using the "Fix Overflow" feature to trim content`)
+        console.error(`❌ CONTENT OVERFLOWS by ${overflowPercent}% - Cannot fit on 1 page with layout alone`)
+        console.error(`❌ Content trimming is REQUIRED to achieve 1-page fit`)
+        layout = getAdaptiveLayout(resumeData, layoutVars)
+        return { layout, overflow: true, overflowPercent }
       }
       break
     }
@@ -143,12 +145,24 @@ async function runPageFitLoop(resumeData, initialLayout) {
     
     if (height <= newContentLimit) {
       console.log('✅ PageFit achieved through layout adjustment!')
-      break
+      layout = getAdaptiveLayout(resumeData, layoutVars)
+      return { layout, overflow: false, overflowPercent: 0 }
     }
   }
   
-  // Return the optimized layout
-  return getAdaptiveLayout(resumeData, layoutVars)
+  // Check if we achieved fit after max iterations
+  const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars)
+  const finalLimit = getContentLimitPx(layoutVars.margins)
+  const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100)
+  
+  layout = getAdaptiveLayout(resumeData, layoutVars)
+  
+  if (overflowPercent > 0) {
+    console.error(`❌ Still overflowing by ${overflowPercent}% after ${maxIterations} iterations`)
+    return { layout, overflow: true, overflowPercent }
+  }
+  
+  return { layout, overflow: false, overflowPercent: 0 }
 }
 
 /**
@@ -495,7 +509,16 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   // STEP 3: PageFit - Iteratively adjust layout to fit one page
   // This loop adjusts ONLY layout variables, NEVER modifies content
   console.log('📏 Running PageFit (layout-only fitting)...')
-  layout = await runPageFitLoop(cleanedData, layout)
+  const pageFitResult = await runPageFitLoop(cleanedData, layout)
+  layout = pageFitResult.layout
+  
+  // CRITICAL: Prevent 2-page overflow by blocking document generation
+  if (pageFitResult.overflow) {
+    const error = new Error(`RESUME_OVERFLOW: Content exceeds 1 page by ${pageFitResult.overflowPercent}%. Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required.`)
+    error.overflowPercent = pageFitResult.overflowPercent
+    error.code = 'RESUME_OVERFLOW'
+    throw error
+  }
   
   // Content is frozen - we only use cleanedData from here, never modify it
   const onePageData = cleanedData

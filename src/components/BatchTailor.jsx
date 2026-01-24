@@ -169,10 +169,16 @@ function BatchTailor({ primaryResume, onBack, onNavigate }) {
             throw new Error('Could not parse tailored resume')
           }
         } catch (err) {
+          // Provide specific error message for overflow
+          let errorMsg = err.message
+          if (err.code === 'RESUME_OVERFLOW') {
+            errorMsg = `Content too long by ${err.overflowPercent}% - exceeded 1-page limit even at minimum layout (10pt, 0.5" margins)`
+          }
+          
           tailoredResumes.push({
             company: companyName,
             status: 'error',
-            error: err.message
+            error: errorMsg
           })
         }
 

@@ -305,7 +305,11 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
       await generateDOCX(tailoredResume, null, companyName)
       alert('Resume downloaded successfully!')
     } catch (error) {
-      alert(`Error generating document: ${error.message}`)
+      if (error.code === 'RESUME_OVERFLOW') {
+        alert(`❌ Resume is ${error.overflowPercent}% too long to fit on 1 page.\n\nLayout compression reached CBS limits (10pt font, 0.5" margins).\n\nPlease manually remove ~${Math.ceil(error.overflowPercent / 2)} lines of content and try again.`)
+      } else {
+        alert(`Error generating document: ${error.message}`)
+      }
     }
   }
 

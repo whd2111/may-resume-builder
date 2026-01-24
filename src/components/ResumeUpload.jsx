@@ -463,13 +463,36 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
       // Generate filename from user's name: LASTNAME_FIRSTNAME_RESUME.docx
       await generateDOCX(rewrittenResume, null, null) // null params let docxGenerator auto-generate filename
     } catch (err) {
-      setError(`Error generating document: ${err.message}`)
+      // Handle overflow error by prompting user to trim content
+      if (err.code === 'RESUME_OVERFLOW') {
+        setError(`⚠️ Resume is ${err.overflowPercent}% too long to fit on 1 page. Use "Fix Overflow" below to automatically trim.`)
+        setShowTrimModal(true)
+        // Pre-fill with estimated lines based on overflow percentage
+        const estimatedLines = Math.ceil(err.overflowPercent / 2) // rough estimate: 2% = 1 line
+        setLinesOver(estimatedLines.toString())
+      } else {
+        setError(`Error generating document: ${err.message}`)
+      }
     }
   }
 
-  const handleSaveAsPrimary = () => {
-    // Save the rewritten resume as the primary resume
-    onResumeComplete(rewrittenResume)
+  const handleSaveAsPrimary = async () => {
+    try {
+      // Validate that resume fits on 1 page before saving
+      await generateDOCX(rewrittenResume, 'temp_validation.docx', null)
+      // If no error thrown, save the resume
+      onResumeComplete(rewrittenResume)
+    } catch (err) {
+      // Handle overflow error by blocking save and prompting trim
+      if (err.code === 'RESUME_OVERFLOW') {
+        setError(`❌ Cannot save: Resume is ${err.overflowPercent}% too long for 1 page. Use "Fix Overflow" to trim first.`)
+        setShowTrimModal(true)
+        const estimatedLines = Math.ceil(err.overflowPercent / 2)
+        setLinesOver(estimatedLines.toString())
+      } else {
+        setError(`Error validating resume: ${err.message}`)
+      }
+    }
   }
 
   const handleMetricsComplete = async (updatedResumeData) => {
