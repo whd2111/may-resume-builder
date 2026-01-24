@@ -65,7 +65,13 @@ FORMATTING:
 IMPORTANT:
 - Maintain all factual information - do NOT fabricate experience
 - Improve wording while staying truthful
-- If metrics are missing, suggest [ADD METRIC] where appropriate
+- CRITICAL: If a bullet lacks specific numbers/metrics, insert [ADD METRIC] placeholder
+- Examples where [ADD METRIC] is needed:
+  * "Managed budget" → "Managed [ADD METRIC] budget"
+  * "Led team" → "Led team of [ADD METRIC] members"
+  * "Increased sales" → "Increased sales by [ADD METRIC]%"
+  * "Improved efficiency" → "Improved efficiency by [ADD METRIC]%"
+- Add [ADD METRIC] generously - better to ask than assume
 
 CHRONOLOGICAL ORDER (CRITICAL):
 - Experience MUST be in REVERSE CHRONOLOGICAL ORDER (most recent first)
@@ -489,9 +495,21 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
           })
           setShowContactPrompter(true)
         } else {
-          // Check if resume has [ADD METRIC] placeholders
-          const hasMetrics = JSON.stringify(finalResumeData).includes('[ADD METRIC]')
-          if (hasMetrics) {
+          // Check if resume has [ADD METRIC] placeholders OR likely needs metrics
+          const resumeString = JSON.stringify(finalResumeData)
+          const hasMetricPlaceholders = resumeString.includes('[ADD METRIC]')
+          
+          // Also check for metric-worthy patterns without numbers
+          const likelyNeedsMetrics = finalResumeData.experience?.some(exp => 
+            exp.bullets?.some(bullet => {
+              // Check if bullet has action verbs but no numbers
+              const hasActionVerb = /^(Managed|Led|Directed|Oversaw|Increased|Reduced|Improved|Generated|Built|Developed|Coordinated|Implemented)/i.test(bullet)
+              const hasNumber = /\d/.test(bullet)
+              return hasActionVerb && !hasNumber
+            })
+          )
+          
+          if (hasMetricPlaceholders || likelyNeedsMetrics) {
             setShowMetricPrompter(true)
           }
         }
