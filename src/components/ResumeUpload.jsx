@@ -506,17 +506,63 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
   }
 
   const handleDownload = async () => {
+    setError('') // Clear any previous errors
+    
     try {
-      // Generate filename from user's name: LASTNAME_FIRSTNAME_RESUME.docx
-      await generateDOCX(rewrittenResume, null, null) // null params let docxGenerator auto-generate filename
+      // Try to generate document
+      await generateDOCX(rewrittenResume, null, null)
     } catch (err) {
-      // Handle overflow error
+      // If overflow, try auto-trimming once more
       if (err.code === 'RESUME_OVERFLOW') {
-        setError(`🚨 RESUME TOO LONG: Your resume is ${err.fillPercent}% filled (95%+ = overflow risk). 
+        console.log(`📏 Download overflow - attempting additional trim...`)
         
-❌ Cannot generate 2-page document - CBS requires 1 page maximum.
+        try {
+          // Calculate trim amount
+          const linesToTrim = Math.max(Math.ceil(err.overflowPercent / 2), 3)
+          
+          const trimPrompt = TRIM_PROMPT
+            .replace(/{LINES_OVER}/g, linesToTrim.toString())
+            .replace('{BULLETS_TO_REMOVE}', Math.ceil(linesToTrim / 1.5).toString())
+            .replace('{BULLETS_TO_SHORTEN}', Math.ceil(linesToTrim * 1.5).toString())
 
-⚠️ This resume was already auto-trimmed but still exceeds 1 page. Please manually edit the content above to remove approximately ${Math.ceil(err.overflowPercent / 2)} more lines, then try downloading again.`)
+          const trimMessage = `Here is the resume that needs to be trimmed by approximately ${linesToTrim} lines:
+
+${JSON.stringify(rewrittenResume, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+          const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+          
+          const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+          if (trimMatch) {
+            const trimmedData = JSON.parse(trimMatch[0])
+            const sortedTrimmed = {
+              ...trimmedData,
+              experience: sortExperienceChronologically(trimmedData.experience)
+            }
+            
+            // Update state with trimmed version
+            setRewrittenResume(sortedTrimmed)
+            setImprovements(`Auto-trimmed to fit 1 page: removed ~${linesToTrim} lines`)
+            
+            // Retry download with trimmed data
+            await generateDOCX(sortedTrimmed, null, null)
+            console.log(`✅ Additional trim successful, document downloaded`)
+          } else {
+            throw new Error('Could not parse trimmed resume')
+          }
+        } catch (retryErr) {
+          // If retry fails, show error
+          if (retryErr.code === 'RESUME_OVERFLOW') {
+            setError(`🚨 RESUME TOO LONG: Still ${retryErr.fillPercent}% filled after auto-trim.
+
+❌ Cannot generate document - exceeds 1-page CBS limit.
+
+Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} more lines, then try downloading again.`)
+          } else {
+            setError(`Error during auto-trim: ${retryErr.message}`)
+          }
+        }
       } else {
         setError(`Error generating document: ${err.message}`)
       }
@@ -524,17 +570,66 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
   }
 
   const handleSaveAsPrimary = async () => {
+    setError('') // Clear any previous errors
+    
     try {
       // Validate that resume fits on 1 page before saving
       await generateDOCX(rewrittenResume, 'temp_validation.docx', null)
       // If no error thrown, save the resume
       onResumeComplete(rewrittenResume)
     } catch (err) {
-      // Handle overflow error by blocking save
+      // If overflow, try auto-trimming once more
       if (err.code === 'RESUME_OVERFLOW') {
-        setError(`🚨 CANNOT SAVE: Resume is ${err.fillPercent}% filled (exceeds 1-page limit).
+        console.log(`📏 Save overflow - attempting additional trim...`)
+        
+        try {
+          // Calculate trim amount
+          const linesToTrim = Math.max(Math.ceil(err.overflowPercent / 2), 3)
+          
+          const trimPrompt = TRIM_PROMPT
+            .replace(/{LINES_OVER}/g, linesToTrim.toString())
+            .replace('{BULLETS_TO_REMOVE}', Math.ceil(linesToTrim / 1.5).toString())
+            .replace('{BULLETS_TO_SHORTEN}', Math.ceil(linesToTrim * 1.5).toString())
 
-⚠️ This resume was already auto-trimmed but still exceeds 1 page. Please manually edit the content above to remove approximately ${Math.ceil(err.overflowPercent / 2)} more lines, then try saving again.`)
+          const trimMessage = `Here is the resume that needs to be trimmed by approximately ${linesToTrim} lines:
+
+${JSON.stringify(rewrittenResume, null, 2)}
+
+Please trim this resume to fit on 1 page. Return ONLY the JSON object with the trimmed resume data.`
+
+          const trimResponse = await callClaude(null, [{ role: 'user', content: trimMessage }], trimPrompt)
+          
+          const trimMatch = trimResponse.match(/\{[\s\S]*"name"[\s\S]*\}/)
+          if (trimMatch) {
+            const trimmedData = JSON.parse(trimMatch[0])
+            const sortedTrimmed = {
+              ...trimmedData,
+              experience: sortExperienceChronologically(trimmedData.experience)
+            }
+            
+            // Update state with trimmed version
+            setRewrittenResume(sortedTrimmed)
+            setImprovements(`Auto-trimmed to fit 1 page: removed ~${linesToTrim} lines`)
+            
+            // Retry validation and save with trimmed data
+            await generateDOCX(sortedTrimmed, 'temp_validation.docx', null)
+            onResumeComplete(sortedTrimmed)
+            console.log(`✅ Additional trim successful, resume saved`)
+          } else {
+            throw new Error('Could not parse trimmed resume')
+          }
+        } catch (retryErr) {
+          // If retry fails, show error
+          if (retryErr.code === 'RESUME_OVERFLOW') {
+            setError(`🚨 CANNOT SAVE: Still ${retryErr.fillPercent}% filled after auto-trim.
+
+❌ Exceeds 1-page CBS limit.
+
+Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} more lines, then try saving again.`)
+          } else {
+            setError(`Error during auto-trim: ${retryErr.message}`)
+          }
+        }
       } else {
         setError(`Error validating resume: ${err.message}`)
       }
