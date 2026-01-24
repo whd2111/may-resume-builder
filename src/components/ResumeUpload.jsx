@@ -217,6 +217,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const [contactForm, setContactForm] = useState({ phone: '', email: '', linkedin: '' })
   const [pageFill, setPageFill] = useState(null)
   const [isManualTrimming, setIsManualTrimming] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Measure page fill when resume changes
   useEffect(() => {
@@ -530,12 +531,23 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
   }
 
   const handleDownload = async () => {
+    if (!rewrittenResume) {
+      setError('No resume data to download')
+      return
+    }
+    
     setError('') // Clear any previous errors
+    setIsDownloading(true)
     
     try {
+      console.log('📥 Download button clicked, generating DOCX...')
+      console.log('Resume data:', JSON.stringify(rewrittenResume, null, 2))
+      
       // Try to generate document
       await generateDOCX(rewrittenResume, null, null)
+      console.log('✅ Download completed successfully')
     } catch (err) {
+      console.error('❌ Download error:', err)
       // If overflow, try auto-trimming once more
       if (err.code === 'RESUME_OVERFLOW') {
         console.log(`📏 Download overflow - attempting additional trim...`)
@@ -590,6 +602,8 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
       } else {
         setError(`Error generating document: ${err.message}`)
       }
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -1149,9 +1163,13 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
                 {isManualTrimming ? '✂️ Trimming...' : '✂️ Trim Resume'}
               </button>
             )}
-            <button className="btn btn-secondary" onClick={handleDownload}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
               <DownloadIcon />
-              Download DOCX
+              {isDownloading ? 'Generating...' : 'Download DOCX'}
             </button>
             <button className="btn btn-primary" onClick={handleSaveAsPrimary}>
               Save as Primary Resume
