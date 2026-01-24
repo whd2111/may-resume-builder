@@ -520,9 +520,17 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   const htmlFillPercent = (finalHeight / finalLimit) * 100
   
   // Adaptive safety margin: high fills are more accurate
-  // 95%+ HTML → use 7% margin (tight compression already applied)
-  // <95% HTML → use 10% margin (more room for error)
-  const safetyMargin = htmlFillPercent >= 95 ? 1.07 : 1.10
+  // 90%+ HTML → use 5% margin (excellent fills, PageFit already optimized)
+  // 85-90% HTML → use 7% margin (good fills)
+  // <85% HTML → use 10% margin (more room for error)
+  let safetyMargin
+  if (htmlFillPercent >= 90) {
+    safetyMargin = 1.05
+  } else if (htmlFillPercent >= 85) {
+    safetyMargin = 1.07
+  } else {
+    safetyMargin = 1.10
+  }
   const estimatedDocxFill = htmlFillPercent * safetyMargin
   
   console.log(`📏 HTML: ${Math.round(htmlFillPercent)}%, Safety margin: ${Math.round((safetyMargin - 1) * 100)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
@@ -534,7 +542,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
       ? pageFitResult.overflowPercent 
       : Math.round(estimatedDocxFill - 100)
     
-    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (95%+ threshold with safety margin)`)
+    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (102%+ threshold with adaptive safety margin)`)
     
     const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(htmlFillPercent)}% HTML, ~${Math.round(estimatedDocxFill)}% DOCX estimated). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
     error.overflowPercent = Math.max(overflowAmount, 5) // Minimum 5% reported
