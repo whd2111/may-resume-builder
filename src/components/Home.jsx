@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import '../App.css'
-import { WritingIcon, TargetIcon, SearchIcon } from '../utils/icons'
+import { WritingIcon, TargetIcon } from '../utils/icons'
 import { useAuth } from '../contexts/AuthContext'
 import AuthModal from './auth/AuthModal'
 
@@ -108,16 +108,6 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
           <h2 className="action-card-title">Tailor for Jobs</h2>
           <p className="action-card-description">
             Customize your resume for specific roles. Paste one job description or multiple at once—May will create tailored versions for each.
-          </p>
-        </div>
-
-        <div className="action-card stagger-3" onClick={() => onNavigate('review')}>
-          <span className="action-card-icon">
-            <SearchIcon />
-          </span>
-          <h2 className="action-card-title">Get Feedback</h2>
-          <p className="action-card-description">
-            Get expert AI analysis of your resume quality. May will score each section and provide specific, actionable suggestions for improvement.
           </p>
         </div>
       </div>
