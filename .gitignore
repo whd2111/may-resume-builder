@@ -43,4 +43,4 @@ api-keys.txt
 .env
 
 #data
-volumes/db/data/*
+*/volumes/db/data/
