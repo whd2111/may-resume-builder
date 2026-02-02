@@ -1,8 +1,9 @@
 export async function callClaude(apiKey, messages, systemPrompt) {
   try {
-    // Call our serverless function instead of Anthropic directly
+    // Call our backend API which proxies to Anthropic
     // This keeps the API key server-side and secure
-    const response = await fetch('/api/claude', {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    const response = await fetch(`${apiUrl}/api/claude`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

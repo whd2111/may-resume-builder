@@ -1,0 +1,17 @@
+[project]
+name = "resume-builder-api"
+version = "0.1.0"
+description = "FastAPI proxy for Anthropic Claude API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "httpx==0.25.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+dev-dependencies = []
