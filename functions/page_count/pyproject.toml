@@ -1,0 +1,10 @@
+[project]
+name = "functions"
+version = "0.1.0"
+description = "Counts pages on .docx files"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "awslambdaric>=3.1.1",
+    "pypdf>=6.6.2",
+]
