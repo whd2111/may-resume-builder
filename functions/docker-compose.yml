@@ -3,12 +3,8 @@ services:
     build:
       context: ./page_count
       args:
-        BUILDKIT_INLINE_CACHE: "1"
-      x-bake:
-        platforms:
-          - linux/amd64
+        LOCAL_DEV: "true"
     ports:
       - "9000:8080"
-    command: ["main.lambda_handler"]
     volumes:
       - ./page_count/main.py:/var/tasks/main.py

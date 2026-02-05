@@ -1,23 +1,31 @@
 import {
+  AlignmentType,
+  BorderStyle,
   Document,
+  LevelFormat,
   Packer,
   Paragraph,
+  TabStopType,
   TextRun,
-  AlignmentType,
-  LevelFormat,
-  BorderStyle,
-  TabStopType
-} from 'docx'
-import { saveAs } from 'file-saver'
-import { validateResumeData, logValidationErrors, autoFixResumeData } from './resumeValidator'
-import { 
-  calculateCharCount, 
-  getDefaultLayoutVars, 
+} from "docx";
+import { saveAs } from "file-saver";
+import {
   DENSITY_THRESHOLDS,
   LAYOUT_BOUNDS,
+  calculateCharCount,
   clampLayoutVars,
-} from '../pageFit/pageFitConfig.js'
-import { measureResumeHeightWithVars } from './resumeMeasurer'
+  getDefaultLayoutVars,
+} from "../pageFit/pageFitConfig.js";
+import {
+  isPageCountServiceAvailable,
+  validateSinglePage,
+} from "./pageCountApi";
+import { measureResumeHeightWithVars } from "./resumeMeasurer";
+import {
+  autoFixResumeData,
+  logValidationErrors,
+  validateResumeData,
+} from "./resumeValidator";
 
 // ============================================
 // ADAPTIVE LAYOUT SYSTEM
@@ -26,25 +34,29 @@ import { measureResumeHeightWithVars } from './resumeMeasurer'
 /**
  * Get layout styles based on content density and PageFit results
  * This implements the "Adaptive Layout" engine that scales based on content amount
- * 
+ *
  * @param {Object} resumeData - Resume data to measure
  * @param {Object} overrideVars - Optional layout variable overrides from PageFit
  * @returns {Object} - Layout configuration for DOCX generation
  */
 function getAdaptiveLayout(resumeData, overrideVars = null) {
   // Calculate content density
-  const charCount = calculateCharCount(resumeData)
-  const isCozy = charCount < DENSITY_THRESHOLDS.SPARSE_MAX
-  
-  console.log(`📐 Layout Mode: ${isCozy ? 'COZY' : 'COMPACT'} (${charCount} chars)`)
-  
+  const charCount = calculateCharCount(resumeData);
+  const isCozy = charCount < DENSITY_THRESHOLDS.SPARSE_MAX;
+
+  console.log(
+    `📐 Layout Mode: ${isCozy ? "COZY" : "COMPACT"} (${charCount} chars)`,
+  );
+
   // Get default layout vars based on density
-  const layoutVars = overrideVars ? clampLayoutVars(overrideVars) : getDefaultLayoutVars(charCount)
-  
+  const layoutVars = overrideVars
+    ? clampLayoutVars(overrideVars)
+    : getDefaultLayoutVars(charCount);
+
   // Calculate right tab position based on margins
   // Letter width: 8.5" = 12240 TWIPs - left margin - right margin
-  const rightTabPosition = 12240 - (layoutVars.margins * 2)
-  
+  const rightTabPosition = 12240 - layoutVars.margins * 2;
+
   return {
     MARGIN: layoutVars.margins,
     FONT_SIZE: {
@@ -65,14 +77,14 @@ function getAdaptiveLayout(resumeData, overrideVars = null) {
     },
     LINE_HEIGHT: layoutVars.lineHeight,
     RIGHT_TAB_POSITION: rightTabPosition,
-    _mode: isCozy ? 'cozy' : 'compact',
+    _mode: isCozy ? "cozy" : "compact",
     _charCount: charCount,
     _layoutVars: layoutVars, // Keep original for PageFit iterations
-  }
+  };
 }
 
 // Font family - CBS Resume Standards require Times New Roman
-const FONT_FAMILY = 'Times New Roman'
+const FONT_FAMILY = "Times New Roman";
 
 // ============================================
 // PAGEFIT LOOP - Layout-Only Fitting
@@ -80,92 +92,111 @@ const FONT_FAMILY = 'Times New Roman'
 
 /**
  * PageFit Loop: Iteratively adjust layout to fit content on one page
- * 
+ *
  * NON-NEGOTIABLE: This function NEVER modifies content.
  * It only adjusts layout parameters (fonts, spacing, margins).
- * 
+ *
  * @param {Object} resumeData - Resume content (READ-ONLY)
  * @param {Object} initialLayout - Initial layout configuration
  * @returns {Object} - { layout, overflow, overflowPercent }
  */
 async function runPageFitLoop(resumeData, initialLayout) {
-  const maxIterations = 20 // Increased for more aggressive compression
-  let layout = { ...initialLayout }
-  let layoutVars = { ...layout._layoutVars }
-  
+  const maxIterations = 20; // Increased for more aggressive compression
+  let layout = { ...initialLayout };
+  let layoutVars = { ...layout._layoutVars };
+
   // Measure initial height
-  let height = measureResumeHeightWithVars(resumeData, layoutVars)
-  const contentLimit = getContentLimitPx(layoutVars.margins)
-  
-  console.log(`📏 Initial: ${height}px / ${contentLimit}px (${Math.round(height / contentLimit * 100)}%)`)
-  
+  let height = measureResumeHeightWithVars(resumeData, layoutVars);
+  const contentLimit = getContentLimitPx(layoutVars.margins);
+
+  console.log(
+    `📏 Initial: ${height}px / ${contentLimit}px (${Math.round((height / contentLimit) * 100)}%)`,
+  );
+
   // If already fits, check if we should expand to fill the page better
   if (height <= contentLimit) {
-    const fillPercent = (height / contentLimit) * 100
+    const fillPercent = (height / contentLimit) * 100;
     // CONSERVATIVE: Only expand if <85% filled (very sparse)
     // Target range is 85-90% - this leaves 1-2 lines of white space as buffer
     // Better to have breathing room than risk overflow after DOCX conversion
     if (fillPercent < 85) {
-      console.log(`📏 Very sparse (${Math.round(fillPercent)}%), expanding layout to improve fill...`)
-      layoutVars = expandLayoutIteratively(layoutVars, height, contentLimit, resumeData)
-      layout = getAdaptiveLayout(resumeData, layoutVars)
+      console.log(
+        `📏 Very sparse (${Math.round(fillPercent)}%), expanding layout to improve fill...`,
+      );
+      layoutVars = expandLayoutIteratively(
+        layoutVars,
+        height,
+        contentLimit,
+        resumeData,
+      );
+      layout = getAdaptiveLayout(resumeData, layoutVars);
     } else {
-      console.log(`📏 Good fill already (${Math.round(fillPercent)}%), no expansion needed`)
+      console.log(
+        `📏 Good fill already (${Math.round(fillPercent)}%), no expansion needed`,
+      );
     }
-    return { layout, overflow: false, overflowPercent: 0 }
+    return { layout, overflow: false, overflowPercent: 0 };
   }
-  
+
   // Overflow: need to compress layout
-  console.log('📏 Overflow detected, compressing layout...')
-  
+  console.log("📏 Overflow detected, compressing layout...");
+
   for (let i = 0; i < maxIterations; i++) {
     // Try compressing layout vars
-    const newLayoutVars = compressLayoutStep(layoutVars)
-    
+    const newLayoutVars = compressLayoutStep(layoutVars);
+
     // If no more compression possible, stop
     if (!newLayoutVars) {
-      console.log(`📏 No more layout compression possible at iteration ${i + 1}`)
-      
+      console.log(
+        `📏 No more layout compression possible at iteration ${i + 1}`,
+      );
+
       // Check final overflow amount
-      const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars)
-      const finalLimit = getContentLimitPx(layoutVars.margins)
-      const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100)
-      
+      const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars);
+      const finalLimit = getContentLimitPx(layoutVars.margins);
+      const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100);
+
       if (overflowPercent > 0) {
-        console.error(`❌ CONTENT OVERFLOWS by ${overflowPercent}% - Cannot fit on 1 page with layout alone`)
-        console.error(`❌ Content trimming is REQUIRED to achieve 1-page fit`)
-        layout = getAdaptiveLayout(resumeData, layoutVars)
-        return { layout, overflow: true, overflowPercent }
+        console.error(
+          `❌ CONTENT OVERFLOWS by ${overflowPercent}% - Cannot fit on 1 page with layout alone`,
+        );
+        console.error(`❌ Content trimming is REQUIRED to achieve 1-page fit`);
+        layout = getAdaptiveLayout(resumeData, layoutVars);
+        return { layout, overflow: true, overflowPercent };
       }
-      break
+      break;
     }
-    
-    layoutVars = newLayoutVars
-    height = measureResumeHeightWithVars(resumeData, layoutVars)
-    const newContentLimit = getContentLimitPx(layoutVars.margins)
-    
-    console.log(`📏 Iteration ${i + 1}: ${height}px / ${newContentLimit}px (${Math.round(height / newContentLimit * 100)}%)`)
-    
+
+    layoutVars = newLayoutVars;
+    height = measureResumeHeightWithVars(resumeData, layoutVars);
+    const newContentLimit = getContentLimitPx(layoutVars.margins);
+
+    console.log(
+      `📏 Iteration ${i + 1}: ${height}px / ${newContentLimit}px (${Math.round((height / newContentLimit) * 100)}%)`,
+    );
+
     if (height <= newContentLimit) {
-      console.log('✅ PageFit achieved through layout adjustment!')
-      layout = getAdaptiveLayout(resumeData, layoutVars)
-      return { layout, overflow: false, overflowPercent: 0 }
+      console.log("✅ PageFit achieved through layout adjustment!");
+      layout = getAdaptiveLayout(resumeData, layoutVars);
+      return { layout, overflow: false, overflowPercent: 0 };
     }
   }
-  
+
   // Check if we achieved fit after max iterations
-  const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars)
-  const finalLimit = getContentLimitPx(layoutVars.margins)
-  const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100)
-  
-  layout = getAdaptiveLayout(resumeData, layoutVars)
-  
+  const finalHeight = measureResumeHeightWithVars(resumeData, layoutVars);
+  const finalLimit = getContentLimitPx(layoutVars.margins);
+  const overflowPercent = Math.round((finalHeight / finalLimit - 1) * 100);
+
+  layout = getAdaptiveLayout(resumeData, layoutVars);
+
   if (overflowPercent > 0) {
-    console.error(`❌ Still overflowing by ${overflowPercent}% after ${maxIterations} iterations`)
-    return { layout, overflow: true, overflowPercent }
+    console.error(
+      `❌ Still overflowing by ${overflowPercent}% after ${maxIterations} iterations`,
+    );
+    return { layout, overflow: true, overflowPercent };
   }
-  
-  return { layout, overflow: false, overflowPercent: 0 }
+
+  return { layout, overflow: false, overflowPercent: 0 };
 }
 
 /**
@@ -174,125 +205,137 @@ async function runPageFitLoop(resumeData, initialLayout) {
  * @returns {number} - Available height in pixels
  */
 function getContentLimitPx(marginTwips) {
-  const DPI = 96
-  const PAGE_HEIGHT_PX = 11 * DPI // 1056px
-  const marginPx = (marginTwips / 1440) * DPI
-  const safetyBuffer = 20 // Safety margin for DOCX rendering differences
-  return PAGE_HEIGHT_PX - (marginPx * 2) - safetyBuffer
+  const DPI = 96;
+  const PAGE_HEIGHT_PX = 11 * DPI; // 1056px
+  const marginPx = (marginTwips / 1440) * DPI;
+  const safetyBuffer = 20; // Safety margin for DOCX rendering differences
+  return PAGE_HEIGHT_PX - marginPx * 2 - safetyBuffer;
 }
 
 /**
  * Compress layout by one step (reduce spacing/fonts within bounds)
  * Priority order: spacing first, then fonts, then margins
- * 
+ *
  * @param {Object} layoutVars - Current layout variables
  * @returns {Object|null} - New layout vars, or null if at minimum
  */
 function compressLayoutStep(layoutVars) {
-  const vars = { ...layoutVars }
-  
+  const vars = { ...layoutVars };
+
   // Priority order for compression
   const compressionOrder = [
-    { key: 'bulletSpacing', bound: LAYOUT_BOUNDS.bulletSpacing },
-    { key: 'roleGap', bound: LAYOUT_BOUNDS.roleGap },
-    { key: 'sectionSpacingAfter', bound: LAYOUT_BOUNDS.sectionSpacingAfter },
-    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
-    { key: 'contactSpacingAfter', bound: LAYOUT_BOUNDS.contactSpacingAfter },
-    { key: 'nameSpacingAfter', bound: LAYOUT_BOUNDS.nameSpacingAfter },
-    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
-    { key: 'bodyFontSize', bound: LAYOUT_BOUNDS.bodyFontSize },
-    { key: 'sectionHeaderFontSize', bound: LAYOUT_BOUNDS.sectionHeaderFontSize },
-    { key: 'nameFontSize', bound: LAYOUT_BOUNDS.nameFontSize },
-    { key: 'margins', bound: LAYOUT_BOUNDS.margins },
-  ]
-  
+    { key: "bulletSpacing", bound: LAYOUT_BOUNDS.bulletSpacing },
+    { key: "roleGap", bound: LAYOUT_BOUNDS.roleGap },
+    { key: "sectionSpacingAfter", bound: LAYOUT_BOUNDS.sectionSpacingAfter },
+    { key: "sectionSpacingBefore", bound: LAYOUT_BOUNDS.sectionSpacingBefore },
+    { key: "contactSpacingAfter", bound: LAYOUT_BOUNDS.contactSpacingAfter },
+    { key: "nameSpacingAfter", bound: LAYOUT_BOUNDS.nameSpacingAfter },
+    { key: "lineHeight", bound: LAYOUT_BOUNDS.lineHeight },
+    { key: "bodyFontSize", bound: LAYOUT_BOUNDS.bodyFontSize },
+    {
+      key: "sectionHeaderFontSize",
+      bound: LAYOUT_BOUNDS.sectionHeaderFontSize,
+    },
+    { key: "nameFontSize", bound: LAYOUT_BOUNDS.nameFontSize },
+    { key: "margins", bound: LAYOUT_BOUNDS.margins },
+  ];
+
   for (const { key, bound } of compressionOrder) {
-    const current = vars[key]
-    const newValue = current - bound.step
-    
+    const current = vars[key];
+    const newValue = current - bound.step;
+
     if (newValue >= bound.min) {
-      vars[key] = newValue
-      return vars
+      vars[key] = newValue;
+      return vars;
     }
   }
-  
+
   // All at minimum, no more compression possible
-  return null
+  return null;
 }
 
 /**
  * Iteratively expand layout to fill underfull page
  * Continues expanding until page is well-filled (90-98%) or max bounds reached
- * 
+ *
  * @param {Object} layoutVars - Current layout variables
  * @param {number} currentHeight - Current content height
  * @param {number} targetHeight - Target content height (available page height)
  * @param {Object} resumeData - Resume data for re-measurement
  * @returns {Object} - Expanded layout vars
  */
-function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resumeData) {
-  let vars = { ...layoutVars }
-  const maxIterations = 25 // More iterations for better fill
-  
+function expandLayoutIteratively(
+  layoutVars,
+  currentHeight,
+  targetHeight,
+  resumeData,
+) {
+  let vars = { ...layoutVars };
+  const maxIterations = 25; // More iterations for better fill
+
   // Expansion priority: spacing first (most visual impact), then line height, then fonts
   const expansionOrder = [
-    { key: 'roleGap', bound: LAYOUT_BOUNDS.roleGap },
-    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
-    { key: 'bulletSpacing', bound: LAYOUT_BOUNDS.bulletSpacing },
-    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
-    { key: 'sectionSpacingAfter', bound: LAYOUT_BOUNDS.sectionSpacingAfter },
-    { key: 'contactSpacingAfter', bound: LAYOUT_BOUNDS.contactSpacingAfter },
-    { key: 'nameSpacingAfter', bound: LAYOUT_BOUNDS.nameSpacingAfter },
-    { key: 'bodyFontSize', bound: LAYOUT_BOUNDS.bodyFontSize },
-  ]
-  
+    { key: "roleGap", bound: LAYOUT_BOUNDS.roleGap },
+    { key: "sectionSpacingBefore", bound: LAYOUT_BOUNDS.sectionSpacingBefore },
+    { key: "bulletSpacing", bound: LAYOUT_BOUNDS.bulletSpacing },
+    { key: "lineHeight", bound: LAYOUT_BOUNDS.lineHeight },
+    { key: "sectionSpacingAfter", bound: LAYOUT_BOUNDS.sectionSpacingAfter },
+    { key: "contactSpacingAfter", bound: LAYOUT_BOUNDS.contactSpacingAfter },
+    { key: "nameSpacingAfter", bound: LAYOUT_BOUNDS.nameSpacingAfter },
+    { key: "bodyFontSize", bound: LAYOUT_BOUNDS.bodyFontSize },
+  ];
+
   for (let i = 0; i < maxIterations; i++) {
     // Measure current height with these vars
-    const height = measureResumeHeightWithVars(resumeData, vars)
-    const newContentLimit = getContentLimitPx(vars.margins)
-    const fillPercent = (height / newContentLimit) * 100
-    
-    console.log(`📏 Expand iteration ${i + 1}: ${Math.round(fillPercent)}% filled`)
-    
+    const height = measureResumeHeightWithVars(resumeData, vars);
+    const newContentLimit = getContentLimitPx(vars.margins);
+    const fillPercent = (height / newContentLimit) * 100;
+
+    console.log(
+      `📏 Expand iteration ${i + 1}: ${Math.round(fillPercent)}% filled`,
+    );
+
     // CONSERVATIVE Target: 85-90% filled - leave breathing room to avoid overflow
     // Better to have 1-2 lines of white space than risk going to 2 pages
     if (fillPercent >= 85 && fillPercent <= 90) {
-      console.log(`✅ Good fill achieved: ${Math.round(fillPercent)}% (conservative target)`)
-      break
+      console.log(
+        `✅ Good fill achieved: ${Math.round(fillPercent)}% (conservative target)`,
+      );
+      break;
     }
-    
+
     // If we overflow, stop
     if (fillPercent > 99) {
-      console.log(`⚠️ Near overflow, stopping expansion`)
-      break
+      console.log(`⚠️ Near overflow, stopping expansion`);
+      break;
     }
-    
+
     // Expand MULTIPLE variables per iteration for faster fill
-    let expanded = false
-    let expansionsThisRound = 0
-    const maxExpansionsPerRound = 3 // Expand up to 3 variables per iteration
-    
+    let expanded = false;
+    let expansionsThisRound = 0;
+    const maxExpansionsPerRound = 3; // Expand up to 3 variables per iteration
+
     for (const { key, bound } of expansionOrder) {
-      if (expansionsThisRound >= maxExpansionsPerRound) break
-      
-      const current = vars[key]
-      const newValue = current + bound.step
-      
+      if (expansionsThisRound >= maxExpansionsPerRound) break;
+
+      const current = vars[key];
+      const newValue = current + bound.step;
+
       if (newValue <= bound.max) {
-        vars[key] = newValue
-        expanded = true
-        expansionsThisRound++
+        vars[key] = newValue;
+        expanded = true;
+        expansionsThisRound++;
       }
     }
-    
+
     // If nothing could be expanded, we're at max bounds
     if (!expanded) {
-      console.log(`📏 All layout variables at maximum bounds`)
-      break
+      console.log(`📏 All layout variables at maximum bounds`);
+      break;
     }
   }
-  
-  return vars
+
+  return vars;
 }
 
 /**
@@ -300,29 +343,29 @@ function expandLayoutIteratively(layoutVars, currentHeight, targetHeight, resume
  * Expand layout to fill underfull page (single pass)
  */
 function expandLayout(layoutVars, currentHeight, targetHeight) {
-  const vars = { ...layoutVars }
-  const expansionRatio = targetHeight / currentHeight
-  
+  const vars = { ...layoutVars };
+  const expansionRatio = targetHeight / currentHeight;
+
   // Only expand spacing, not fonts (fonts at comfortable size is good)
   const expansionOrder = [
-    { key: 'roleGap', bound: LAYOUT_BOUNDS.roleGap },
-    { key: 'sectionSpacingBefore', bound: LAYOUT_BOUNDS.sectionSpacingBefore },
-    { key: 'sectionSpacingAfter', bound: LAYOUT_BOUNDS.sectionSpacingAfter },
-    { key: 'bulletSpacing', bound: LAYOUT_BOUNDS.bulletSpacing },
-    { key: 'lineHeight', bound: LAYOUT_BOUNDS.lineHeight },
-  ]
-  
+    { key: "roleGap", bound: LAYOUT_BOUNDS.roleGap },
+    { key: "sectionSpacingBefore", bound: LAYOUT_BOUNDS.sectionSpacingBefore },
+    { key: "sectionSpacingAfter", bound: LAYOUT_BOUNDS.sectionSpacingAfter },
+    { key: "bulletSpacing", bound: LAYOUT_BOUNDS.bulletSpacing },
+    { key: "lineHeight", bound: LAYOUT_BOUNDS.lineHeight },
+  ];
+
   // Expand each spacing proportionally, up to max bounds
   for (const { key, bound } of expansionOrder) {
-    const current = vars[key]
+    const current = vars[key];
     const expanded = Math.min(
       bound.max,
-      Math.round(current * Math.min(1.2, expansionRatio)) // Cap at 20% expansion
-    )
-    vars[key] = expanded
+      Math.round(current * Math.min(1.2, expansionRatio)), // Cap at 20% expansion
+    );
+    vars[key] = expanded;
   }
-  
-  return vars
+
+  return vars;
 }
 
 // ============================================
@@ -333,78 +376,84 @@ function expandLayout(layoutVars, currentHeight, targetHeight) {
  * Convert string to Title Case
  */
 function toTitleCase(str) {
-  if (!str) return ''
+  if (!str) return "";
   return str
     .toLowerCase()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 /**
  * Latin honors that should be lowercase and italicized per CBS standards
  */
-const LATIN_HONORS = [
-  'summa cum laude',
-  'magna cum laude', 
-  'cum laude'
-]
+const LATIN_HONORS = ["summa cum laude", "magna cum laude", "cum laude"];
 
 /**
  * Check if text contains Latin honors and format appropriately
  * Returns array of TextRun objects with proper formatting
  */
 function formatTextWithLatinHonors(text, baseSize, baseFont) {
-  if (!text) return []
-  
-  let remainingText = text
-  const runs = []
-  
+  if (!text) return [];
+
+  let remainingText = text;
+  const runs = [];
+
   // Check for each Latin honor phrase
   for (const honor of LATIN_HONORS) {
-    const lowerText = remainingText.toLowerCase()
-    const honorIndex = lowerText.indexOf(honor)
-    
+    const lowerText = remainingText.toLowerCase();
+    const honorIndex = lowerText.indexOf(honor);
+
     if (honorIndex !== -1) {
       // Add text before the honor
       if (honorIndex > 0) {
-        runs.push(new TextRun({
-          text: remainingText.substring(0, honorIndex),
+        runs.push(
+          new TextRun({
+            text: remainingText.substring(0, honorIndex),
+            size: baseSize,
+            font: baseFont,
+            italics: true,
+          }),
+        );
+      }
+
+      // Add the Latin honor in lowercase and italics
+      runs.push(
+        new TextRun({
+          text: honor, // Always lowercase
           size: baseSize,
           font: baseFont,
-          italics: true
-        }))
-      }
-      
-      // Add the Latin honor in lowercase and italics
-      runs.push(new TextRun({
-        text: honor, // Always lowercase
-        size: baseSize,
-        font: baseFont,
-        italics: true
-      }))
-      
+          italics: true,
+        }),
+      );
+
       // Continue with remaining text
-      remainingText = remainingText.substring(honorIndex + honor.length)
+      remainingText = remainingText.substring(honorIndex + honor.length);
     }
   }
-  
+
   // Add any remaining text
   if (remainingText.length > 0) {
-    runs.push(new TextRun({
-      text: remainingText,
-      size: baseSize,
-      font: baseFont,
-      italics: true
-    }))
+    runs.push(
+      new TextRun({
+        text: remainingText,
+        size: baseSize,
+        font: baseFont,
+        italics: true,
+      }),
+    );
   }
-  
-  return runs.length > 0 ? runs : [new TextRun({
-    text: text,
-    size: baseSize,
-    font: baseFont,
-    italics: true
-  })]
+
+  return runs.length > 0
+    ? runs
+    : [
+        new TextRun({
+          text: text,
+          size: baseSize,
+          font: baseFont,
+          italics: true,
+        }),
+      ];
 }
 
 /**
@@ -419,22 +468,22 @@ function createSectionHeader(title, layout) {
         text: title.toUpperCase(),
         bold: true,
         size: layout.FONT_SIZE.SECTION_HEADER,
-        font: FONT_FAMILY
-      })
+        font: FONT_FAMILY,
+      }),
     ],
-    spacing: { 
-      before: layout.SPACING.SECTION_BEFORE, 
-      after: layout.SPACING.SECTION_AFTER 
+    spacing: {
+      before: layout.SPACING.SECTION_BEFORE,
+      after: layout.SPACING.SECTION_AFTER,
     },
     border: {
       bottom: {
-        color: '000000',
+        color: "000000",
         space: 1,
         style: BorderStyle.SINGLE,
-        size: 6
-      }
-    }
-  })
+        size: 6,
+      },
+    },
+  });
 }
 
 /**
@@ -446,121 +495,156 @@ function createSectionHeader(title, layout) {
 function createBulletParagraph(text, layout, isLast = false) {
   return new Paragraph({
     numbering: {
-      reference: 'resume-bullets',
-      level: 0
+      reference: "resume-bullets",
+      level: 0,
     },
     children: [
       new TextRun({
         text: text,
         size: layout.FONT_SIZE.BULLET,
-        font: FONT_FAMILY
-      })
+        font: FONT_FAMILY,
+      }),
     ],
-    spacing: { 
+    spacing: {
       after: isLast ? layout.SPACING.ROLE_GAP : layout.SPACING.BULLET_AFTER,
-      line: layout.LINE_HEIGHT
-    }
-  })
+      line: layout.LINE_HEIGHT,
+    },
+  });
 }
 
 // ============================================
 // MAIN EXPORT FUNCTION
 // ============================================
 
-export async function generateDOCX(resumeData, filename = null, companyName = null, layoutOverrides = null) {
+/**
+ * Generate a DOCX resume with optional page count validation
+ *
+ * @param {Object} resumeData - Resume data structure
+ * @param {string|null} filename - Output filename (auto-generated if null)
+ * @param {string|null} companyName - Company name for tailored resumes
+ * @param {Object|null} layoutOverrides - Optional layout variable overrides
+ * @param {Object} options - Generation options
+ * @param {boolean} options.validatePageCount - Whether to validate exact 1-page fit (default: true)
+ * @param {number} options.maxValidationAttempts - Max page count validation retries (default: 5)
+ * @param {Function} options.onProgress - Progress callback: (message, attempt, maxAttempts) => void
+ * @returns {Promise<void>}
+ */
+export async function generateDOCX(
+  resumeData,
+  filename = null,
+  companyName = null,
+  layoutOverrides = null,
+  options = {},
+) {
+  const {
+    validatePageCount = true,
+    maxValidationAttempts = 5,
+    onProgress = () => {},
+  } = options;
   // Auto-generate filename if not provided
   if (!filename) {
-    const nameParts = resumeData.name.trim().split(' ')
-    const lastName = nameParts[nameParts.length - 1].toUpperCase()
-    const firstName = nameParts[0].toUpperCase()
-    
+    const nameParts = resumeData.name.trim().split(" ");
+    const lastName = nameParts[nameParts.length - 1].toUpperCase();
+    const firstName = nameParts[0].toUpperCase();
+
     if (companyName) {
       // For tailored resumes: LASTNAME_FIRSTNAME_COMPANY.docx
-      const cleanCompany = companyName.toUpperCase().replace(/[^A-Z0-9]/g, '')
-      filename = `${lastName}_${firstName}_${cleanCompany}.docx`
+      const cleanCompany = companyName.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      filename = `${lastName}_${firstName}_${cleanCompany}.docx`;
     } else {
       // For primary resumes
-      filename = `${lastName}_${firstName}_RESUME.docx`
+      filename = `${lastName}_${firstName}_RESUME.docx`;
     }
   }
 
   // STEP 1: Validate resume data for broken output
-  console.log('🔍 Validating resume data...')
-  const validation = validateResumeData(resumeData)
-  logValidationErrors(validation)
-  
+  console.log("🔍 Validating resume data...");
+  const validation = validateResumeData(resumeData);
+  logValidationErrors(validation);
+
   // Auto-fix common issues if validation failed
-  let cleanedData = resumeData
+  let cleanedData = resumeData;
   if (!validation.valid) {
-    console.warn('⚠️ Attempting to auto-fix issues...')
-    cleanedData = autoFixResumeData(resumeData)
-    
+    console.warn("⚠️ Attempting to auto-fix issues...");
+    cleanedData = autoFixResumeData(resumeData);
+
     // Re-validate
-    const revalidation = validateResumeData(cleanedData)
+    const revalidation = validateResumeData(cleanedData);
     if (!revalidation.valid) {
-      console.error('❌ Auto-fix failed. Some issues remain.')
-      logValidationErrors(revalidation)
+      console.error("❌ Auto-fix failed. Some issues remain.");
+      logValidationErrors(revalidation);
     } else {
-      console.log('✅ Auto-fix successful!')
+      console.log("✅ Auto-fix successful!");
     }
   }
-  
+
   // STEP 2: Get adaptive layout based on content density
   // PageFit adjusts ONLY layout parameters, NEVER content
-  console.log('📐 Calculating adaptive layout...')
-  let layout = getAdaptiveLayout(cleanedData, layoutOverrides)
-  
+  console.log("📐 Calculating adaptive layout...");
+  let layout = getAdaptiveLayout(cleanedData, layoutOverrides);
+
   // STEP 3: PageFit - Iteratively adjust layout to fit one page
   // This loop adjusts ONLY layout variables, NEVER modifies content
-  console.log('📏 Running PageFit (layout-only fitting)...')
-  const pageFitResult = await runPageFitLoop(cleanedData, layout)
-  layout = pageFitResult.layout
-  
+  console.log("📏 Running PageFit (layout-only fitting)...");
+  const pageFitResult = await runPageFitLoop(cleanedData, layout);
+  layout = pageFitResult.layout;
+
   // CRITICAL: Prevent 2-page overflow by blocking document generation
   // HTML measurement underestimates DOCX height - use adaptive safety margin
   // Higher fills (95%+) need less margin since PageFit already compressed aggressively
-  const finalHeight = measureResumeHeightWithVars(cleanedData, pageFitResult.layout._layoutVars)
-  const finalLimit = getContentLimitPx(pageFitResult.layout._layoutVars.margins)
-  const htmlFillPercent = (finalHeight / finalLimit) * 100
-  
+  const finalHeight = measureResumeHeightWithVars(
+    cleanedData,
+    pageFitResult.layout._layoutVars,
+  );
+  const finalLimit = getContentLimitPx(
+    pageFitResult.layout._layoutVars.margins,
+  );
+  const htmlFillPercent = (finalHeight / finalLimit) * 100;
+
   // CONSERVATIVE safety margin: Better to be 1-2 lines SHORT than risk overflow
   // Aim for 85-90% target, block at 95%+ estimated DOCX
   // 90%+ HTML → use 8% margin (still aggressive compression, but safer)
-  // 85-90% HTML → use 10% margin 
+  // 85-90% HTML → use 10% margin
   // <85% HTML → use 12% margin (extra conservative for lower fills)
-  let safetyMargin
+  let safetyMargin;
   if (htmlFillPercent >= 90) {
-    safetyMargin = 1.08
+    safetyMargin = 1.08;
   } else if (htmlFillPercent >= 85) {
-    safetyMargin = 1.10
+    safetyMargin = 1.1;
   } else {
-    safetyMargin = 1.12
+    safetyMargin = 1.12;
   }
-  const estimatedDocxFill = htmlFillPercent * safetyMargin
-  
-  console.log(`📏 HTML: ${Math.round(htmlFillPercent)}%, Safety margin: ${Math.round((safetyMargin - 1) * 100)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`)
-  
+  const estimatedDocxFill = htmlFillPercent * safetyMargin;
+
+  console.log(
+    `📏 HTML: ${Math.round(htmlFillPercent)}%, Safety margin: ${Math.round((safetyMargin - 1) * 100)}%, Estimated DOCX: ${Math.round(estimatedDocxFill)}%`,
+  );
+
   // CONSERVATIVE blocking: Block at 98% estimated to ensure 1-2 lines of breathing room
   // User preference: Better to have white space than risk 2-page overflow
   if (pageFitResult.overflow || estimatedDocxFill >= 98) {
-    const overflowAmount = pageFitResult.overflow 
-      ? pageFitResult.overflowPercent 
-      : Math.round(estimatedDocxFill - 100)
-    
-    console.error(`❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (98%+ conservative threshold - prioritizing white space over overflow)`)
-    
-    const error = new Error(`RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(htmlFillPercent)}% HTML, ~${Math.round(estimatedDocxFill)}% DOCX estimated). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`)
-    error.overflowPercent = Math.max(overflowAmount, 5) // Minimum 5% reported
-    error.fillPercent = Math.round(estimatedDocxFill)
-    error.code = 'RESUME_OVERFLOW'
-    throw error
+    const overflowAmount = pageFitResult.overflow
+      ? pageFitResult.overflowPercent
+      : Math.round(estimatedDocxFill - 100);
+
+    console.error(
+      `❌ BLOCKING DOCUMENT GENERATION: ${Math.round(estimatedDocxFill)}% estimated fill (98%+ conservative threshold - prioritizing white space over overflow)`,
+    );
+
+    const error = new Error(
+      `RESUME_OVERFLOW: Content is too long for 1 page (${Math.round(htmlFillPercent)}% HTML, ~${Math.round(estimatedDocxFill)}% DOCX estimated). Layout compression reached CBS limits (10pt font, 0.5" margins). Content trimming required - remove approximately ${Math.ceil(overflowAmount / 2)} lines.`,
+    );
+    error.overflowPercent = Math.max(overflowAmount, 5); // Minimum 5% reported
+    error.fillPercent = Math.round(estimatedDocxFill);
+    error.code = "RESUME_OVERFLOW";
+    throw error;
   }
-  
+
   // Content is frozen - we only use cleanedData from here, never modify it
-  const onePageData = cleanedData
-  
+  const onePageData = cleanedData;
+
   // Build document content using adaptive layout
-  const docChildren = []
+  const docChildren = [];
 
   // ---- HEADER: Name (adaptive size, title case, bold, RIGHT ALIGNED) ----
   docChildren.push(
@@ -571,75 +655,81 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
           text: toTitleCase(onePageData.name),
           bold: true,
           size: layout.FONT_SIZE.NAME,
-          font: FONT_FAMILY
-        })
+          font: FONT_FAMILY,
+        }),
       ],
-      spacing: { after: layout.SPACING.NAME_AFTER }
-    })
-  )
+      spacing: { after: layout.SPACING.NAME_AFTER },
+    }),
+  );
 
   // ---- CONTACT INFO (adaptive size, single line with |, RIGHT ALIGNED) ----
   const contactParts = [
     onePageData.contact?.phone,
     onePageData.contact?.email,
-    onePageData.contact?.linkedin
-  ].filter(Boolean)
-  
+    onePageData.contact?.linkedin,
+  ].filter(Boolean);
+
   if (contactParts.length > 0) {
     docChildren.push(
       new Paragraph({
         alignment: AlignmentType.RIGHT,
         children: [
           new TextRun({
-            text: contactParts.join(' | '),
+            text: contactParts.join(" | "),
             size: layout.FONT_SIZE.CONTACT,
-            font: FONT_FAMILY
-          })
+            font: FONT_FAMILY,
+          }),
         ],
-        spacing: { after: layout.SPACING.CONTACT_AFTER }
-      })
-    )
+        spacing: { after: layout.SPACING.CONTACT_AFTER },
+      }),
+    );
   }
 
   // NOTE: CBS resumes do NOT include Summary/Objective sections - omitted per CBS standards
 
   // ---- EDUCATION SECTION ----
   if (onePageData.education && onePageData.education.length > 0) {
-    docChildren.push(createSectionHeader('Education', layout))
-    docChildren.push(...generateEducationSection(onePageData.education, layout))
+    docChildren.push(createSectionHeader("Education", layout));
+    docChildren.push(
+      ...generateEducationSection(onePageData.education, layout),
+    );
   }
 
   // ---- EXPERIENCE SECTION ----
   if (onePageData.experience && onePageData.experience.length > 0) {
-    docChildren.push(createSectionHeader('Experience', layout))
-    docChildren.push(...generateExperienceSection(onePageData.experience, layout))
+    docChildren.push(createSectionHeader("Experience", layout));
+    docChildren.push(
+      ...generateExperienceSection(onePageData.experience, layout),
+    );
   }
 
   // ---- SKILLS SECTION (compact, no extra label) ----
   if (onePageData.skills) {
-    docChildren.push(...generateSkillsSection(onePageData.skills, layout))
+    docChildren.push(...generateSkillsSection(onePageData.skills, layout));
   }
 
   // ---- ADDITIONAL SECTION (if present) ----
   if (onePageData.additional) {
-    docChildren.push(createSectionHeader('Additional', layout))
+    docChildren.push(createSectionHeader("Additional", layout));
     docChildren.push(
       new Paragraph({
         children: [
           new TextRun({
             text: onePageData.additional,
             size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          })
+            font: FONT_FAMILY,
+          }),
         ],
-        spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT }
-      })
-    )
+        spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT },
+      }),
+    );
   }
 
   // ---- CUSTOM SECTIONS (Awards, Volunteering, etc.) ----
   if (onePageData.custom_sections && onePageData.custom_sections.length > 0) {
-    docChildren.push(...generateCustomSections(onePageData.custom_sections, layout))
+    docChildren.push(
+      ...generateCustomSections(onePageData.custom_sections, layout),
+    );
   }
 
   // Create the document with adaptive layout margins
@@ -649,70 +739,198 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
         document: {
           run: {
             font: FONT_FAMILY,
-            size: layout.FONT_SIZE.BODY
-          }
-        }
-      }
+            size: layout.FONT_SIZE.BODY,
+          },
+        },
+      },
     },
     numbering: {
       config: [
         {
-          reference: 'resume-bullets',
+          reference: "resume-bullets",
           levels: [
             {
               level: 0,
               format: LevelFormat.BULLET,
-              text: '•',
+              text: "•",
               alignment: AlignmentType.LEFT,
               style: {
                 paragraph: {
-                  indent: { left: 280, hanging: 180 }
-                }
-              }
-            }
-          ]
-        }
-      ]
+                  indent: { left: 280, hanging: 180 },
+                },
+              },
+            },
+          ],
+        },
+      ],
     },
     sections: [
       {
         properties: {
           page: {
             size: {
-              width: 12240,  // US Letter width in TWIPs (8.5")
-              height: 15840  // US Letter height in TWIPs (11")
+              width: 12240, // US Letter width in TWIPs (8.5")
+              height: 15840, // US Letter height in TWIPs (11")
             },
             margin: {
               top: layout.MARGIN,
               right: layout.MARGIN,
               bottom: layout.MARGIN,
-              left: layout.MARGIN
-            }
-          }
+              left: layout.MARGIN,
+            },
+          },
         },
-        children: docChildren
-      }
-    ]
-  })
-  
-  console.log(`✅ Document generated with ${layout._mode} layout (margins: ${layout.MARGIN} TWIPs, body font: ${layout.FONT_SIZE.BODY/2}pt)`)
+        children: docChildren,
+      },
+    ],
+  });
 
-  // Generate and save
-  console.log(`📦 Creating blob for file: ${filename}`)
+  console.log(
+    `✅ Document generated with ${layout._mode} layout (margins: ${layout.MARGIN} TWIPs, body font: ${layout.FONT_SIZE.BODY / 2}pt)`,
+  );
+
+  // Generate blob
+  console.log(`📦 Creating blob for file: ${filename}`);
   try {
-    const blob = await Packer.toBlob(doc)
-    console.log(`📦 Blob created, size: ${blob.size} bytes, type: ${blob.type}`)
-    console.log(`💾 Triggering download with saveAs: ${filename}`)
-    
+    let blob = await Packer.toBlob(doc);
+    console.log(
+      `📦 Blob created, size: ${blob.size} bytes, type: ${blob.type}`,
+    );
+
+    // STEP 5: Page count validation using Lambda service
+    // This provides ground-truth validation that the DOCX is exactly 1 page
+    if (validatePageCount) {
+      const serviceAvailable = await isPageCountServiceAvailable();
+
+      if (serviceAvailable) {
+        onProgress(
+          "🔍 Validating exact page count...",
+          0,
+          maxValidationAttempts,
+        );
+        console.log("🔍 Starting page count validation...");
+
+        // Track layout compression attempts for retry logic
+        let currentLayoutVars = { ...layout._layoutVars };
+        let compressionAttempts = 0;
+
+        const validationResult = await validateSinglePage(blob, {
+          maxAttempts: maxValidationAttempts,
+          onProgress: (message, attempt, max) => {
+            console.log(`📄 ${message}`);
+            onProgress(message, attempt, max);
+          },
+          onCompress: async (attempt, pageCount) => {
+            compressionAttempts++;
+            console.log(
+              `📄 Page count: ${pageCount}, compressing layout (attempt ${compressionAttempts})...`,
+            );
+            onProgress(
+              `Compressing layout to fit 1 page (attempt ${attempt})...`,
+              attempt,
+              maxValidationAttempts,
+            );
+
+            // Try to compress layout further
+            // Since we know we are >1 page, apply MULTIPLE compression steps at once
+            // to make a meaningful difference, rather than just one tiny decrement.
+            let newLayoutVars = { ...currentLayoutVars };
+            const stepsToApply = 5; // Aggressive compression: Apply 5 steps of reduction per retry
+            let stepsApplied = 0;
+
+            for (let i = 0; i < stepsToApply; i++) {
+              const nextVars = compressLayoutStep(newLayoutVars);
+              if (nextVars) {
+                newLayoutVars = nextVars;
+                stepsApplied++;
+              } else {
+                console.log(
+                  `⚠️ Layout bottomed out after ${stepsApplied} steps`,
+                );
+                break;
+              }
+            }
+
+            if (stepsApplied === 0) {
+              // Can't compress more - throw error for content trimming
+              console.error(
+                `❌ Layout compression exhausted after ${compressionAttempts} attempts`,
+              );
+              const error = new Error(
+                `RESUME_OVERFLOW: Document is ${pageCount} pages. Layout compression exhausted (10pt font, 0.5" margins). Content trimming required.`,
+              );
+              error.code = "RESUME_OVERFLOW";
+              error.pageCount = pageCount;
+              error.overflowPercent = (pageCount - 1) * 50; // Rough estimate
+              throw error;
+            }
+
+            console.log(
+              `📉 Applied ${stepsApplied} compression steps. New margins: ${newLayoutVars.margins}, Body font: ${newLayoutVars.bodyFontSize}`,
+            );
+            currentLayoutVars = newLayoutVars;
+
+            // Regenerate document with compressed layout
+            const compressedLayout = getAdaptiveLayout(
+              onePageData,
+              currentLayoutVars,
+            );
+
+            // Rebuild the document (reuse the same doc structure building logic)
+            const newDoc = await rebuildDocumentWithLayout(
+              onePageData,
+              compressedLayout,
+              filename,
+            );
+            blob = await Packer.toBlob(newDoc);
+
+            console.log(
+              `📦 Regenerated blob with compressed layout, size: ${blob.size} bytes`,
+            );
+            return blob;
+          },
+        });
+
+        if (!validationResult.valid) {
+          const error = new Error(
+            `RESUME_OVERFLOW: Document is ${validationResult.page_count} pages after ${validationResult.attempts} compression attempts. Content trimming required.`,
+          );
+          error.code = "RESUME_OVERFLOW";
+          error.pageCount = validationResult.page_count;
+          error.overflowPercent = (validationResult.page_count - 1) * 50;
+          throw error;
+        }
+
+        console.log(
+          `✅ Page count validated: exactly 1 page after ${validationResult.attempts} attempt(s)`,
+        );
+        onProgress(
+          `✅ Validated: exactly 1 page`,
+          validationResult.attempts,
+          maxValidationAttempts,
+        );
+      } else {
+        console.warn("⚠️ Page count service unavailable, skipping validation");
+        onProgress(
+          "⚠️ Page count validation skipped (service unavailable)",
+          0,
+          0,
+        );
+      }
+    }
+
+    // STEP 6: Save the file
+    console.log(`💾 Triggering download with saveAs: ${filename}`);
+
     // Trigger download
-    saveAs(blob, filename)
-    
+    saveAs(blob, filename);
+
     // Give browser a moment to trigger download
-    await new Promise(resolve => setTimeout(resolve, 100))
-    console.log(`✅ saveAs completed, download should have started`)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    console.log(`✅ saveAs completed, download should have started`);
   } catch (saveError) {
-    console.error('❌ Error during blob creation or saveAs:', saveError)
-    throw saveError
+    console.error("❌ Error during blob creation or saveAs:", saveError);
+    throw saveError;
   }
 }
 
@@ -723,21 +941,21 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
 /**
  * Generate education entries with dates right-aligned on institution line
  * Supports separate GPA field for cleaner formatting
- * 
+ *
  * @param {Array} education - Education entries
  * @param {Object} layout - Layout configuration from getAdaptiveLayout
  */
 function generateEducationSection(education, layout) {
-  if (!education || education.length === 0) return []
+  if (!education || education.length === 0) return [];
 
-  const elements = []
+  const elements = [];
 
   education.forEach((edu, index) => {
-    const isLast = index === education.length - 1
+    const isLast = index === education.length - 1;
     // Check if we have GPA or details
-    const hasGpa = edu.gpa && edu.gpa.trim()
-    const hasDetails = edu.details && edu.details.trim()
-    const hasAdditionalInfo = hasGpa || hasDetails
+    const hasGpa = edu.gpa && edu.gpa.trim();
+    const hasDetails = edu.details && edu.details.trim();
+    const hasAdditionalInfo = hasGpa || hasDetails;
 
     // Line 1: Institution (left) + Dates (right-aligned)
     elements.push(
@@ -747,41 +965,52 @@ function generateEducationSection(education, layout) {
             text: edu.institution.toUpperCase(),
             bold: true,
             size: layout.FONT_SIZE.COMPANY_TITLE,
-            font: FONT_FAMILY
+            font: FONT_FAMILY,
           }),
-          new TextRun({ text: '\t' }),
+          new TextRun({ text: "\t" }),
           new TextRun({
-            text: edu.dates || '',
+            text: edu.dates || "",
             size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          })
+            font: FONT_FAMILY,
+          }),
         ],
-        tabStops: [{ type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION }],
-        spacing: { after: 0, line: layout.LINE_HEIGHT }
-      })
-    )
+        tabStops: [
+          { type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION },
+        ],
+        spacing: { after: 0, line: layout.LINE_HEIGHT },
+      }),
+    );
 
     // Line 2: Degree (left) + Location (right-aligned)
     elements.push(
       new Paragraph({
         children: [
           new TextRun({
-            text: edu.degree || '',
-            size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          }),
-          new TextRun({ text: '\t' }),
-          new TextRun({
-            text: edu.location || '',
+            text: edu.degree || "",
             size: layout.FONT_SIZE.BODY,
             font: FONT_FAMILY,
-            italics: true
-          })
+          }),
+          new TextRun({ text: "\t" }),
+          new TextRun({
+            text: edu.location || "",
+            size: layout.FONT_SIZE.BODY,
+            font: FONT_FAMILY,
+            italics: true,
+          }),
         ],
-        tabStops: [{ type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION }],
-        spacing: { after: hasAdditionalInfo ? 0 : (isLast ? layout.SPACING.ROLE_GAP : layout.SPACING.ROLE_GAP / 2), line: layout.LINE_HEIGHT }
-      })
-    )
+        tabStops: [
+          { type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION },
+        ],
+        spacing: {
+          after: hasAdditionalInfo
+            ? 0
+            : isLast
+              ? layout.SPACING.ROLE_GAP
+              : layout.SPACING.ROLE_GAP / 2,
+          line: layout.LINE_HEIGHT,
+        },
+      }),
+    );
 
     // Line 3: GPA (if provided as separate field)
     // Format: "GPA: 3.74/4.0" with label bold and value normal
@@ -790,20 +1019,27 @@ function generateEducationSection(education, layout) {
         new Paragraph({
           children: [
             new TextRun({
-              text: 'GPA: ',
+              text: "GPA: ",
               bold: true,
               size: layout.FONT_SIZE.BODY,
-              font: FONT_FAMILY
+              font: FONT_FAMILY,
             }),
             new TextRun({
               text: edu.gpa,
               size: layout.FONT_SIZE.BODY,
-              font: FONT_FAMILY
-            })
+              font: FONT_FAMILY,
+            }),
           ],
-          spacing: { after: hasDetails ? 0 : (isLast ? layout.SPACING.ROLE_GAP : layout.SPACING.ROLE_GAP / 2), line: layout.LINE_HEIGHT }
-        })
-      )
+          spacing: {
+            after: hasDetails
+              ? 0
+              : isLast
+                ? layout.SPACING.ROLE_GAP
+                : layout.SPACING.ROLE_GAP / 2,
+            line: layout.LINE_HEIGHT,
+          },
+        }),
+      );
     }
 
     // Line 4: Additional details (honors, activities, etc.)
@@ -811,29 +1047,38 @@ function generateEducationSection(education, layout) {
     if (hasDetails) {
       elements.push(
         new Paragraph({
-          children: formatTextWithLatinHonors(edu.details, layout.FONT_SIZE.BODY, FONT_FAMILY),
-          spacing: { after: isLast ? layout.SPACING.ROLE_GAP : layout.SPACING.ROLE_GAP / 2, line: layout.LINE_HEIGHT }
-        })
-      )
+          children: formatTextWithLatinHonors(
+            edu.details,
+            layout.FONT_SIZE.BODY,
+            FONT_FAMILY,
+          ),
+          spacing: {
+            after: isLast
+              ? layout.SPACING.ROLE_GAP
+              : layout.SPACING.ROLE_GAP / 2,
+            line: layout.LINE_HEIGHT,
+          },
+        }),
+      );
     }
-  })
+  });
 
-  return elements
+  return elements;
 }
 
 /**
  * Generate experience entries with dates right-aligned on company line
- * 
+ *
  * @param {Array} experience - Experience entries
  * @param {Object} layout - Layout configuration from getAdaptiveLayout
  */
 function generateExperienceSection(experience, layout) {
-  if (!experience || experience.length === 0) return []
+  if (!experience || experience.length === 0) return [];
 
-  const elements = []
+  const elements = [];
 
   experience.forEach((exp, index) => {
-    const isLast = index === experience.length - 1
+    const isLast = index === experience.length - 1;
 
     // Line 1: Company (left) + Dates (right-aligned)
     elements.push(
@@ -843,156 +1088,177 @@ function generateExperienceSection(experience, layout) {
             text: exp.company.toUpperCase(),
             bold: true,
             size: layout.FONT_SIZE.COMPANY_TITLE,
-            font: FONT_FAMILY
+            font: FONT_FAMILY,
           }),
-          new TextRun({ text: '\t' }),
+          new TextRun({ text: "\t" }),
           new TextRun({
-            text: exp.dates || '',
+            text: exp.dates || "",
             size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          })
+            font: FONT_FAMILY,
+          }),
         ],
-        tabStops: [{ type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION }],
-        spacing: { after: 0, line: layout.LINE_HEIGHT }
-      })
-    )
+        tabStops: [
+          { type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION },
+        ],
+        spacing: { after: 0, line: layout.LINE_HEIGHT },
+      }),
+    );
 
     // Line 2: Title (left) + Location (right-aligned)
     elements.push(
       new Paragraph({
         children: [
           new TextRun({
-            text: exp.title || '',
+            text: exp.title || "",
             size: layout.FONT_SIZE.BODY,
             font: FONT_FAMILY,
-            italics: true
+            italics: true,
           }),
-          new TextRun({ text: '\t' }),
+          new TextRun({ text: "\t" }),
           new TextRun({
-            text: exp.location || '',
+            text: exp.location || "",
             size: layout.FONT_SIZE.BODY,
-            font: FONT_FAMILY
-          })
+            font: FONT_FAMILY,
+          }),
         ],
-        tabStops: [{ type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION }],
-        spacing: { after: exp.bullets && exp.bullets.length > 0 ? 0 : layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT }
-      })
-    )
+        tabStops: [
+          { type: TabStopType.RIGHT, position: layout.RIGHT_TAB_POSITION },
+        ],
+        spacing: {
+          after:
+            exp.bullets && exp.bullets.length > 0 ? 0 : layout.SPACING.ROLE_GAP,
+          line: layout.LINE_HEIGHT,
+        },
+      }),
+    );
 
     // Bullets with tight spacing
     if (exp.bullets && exp.bullets.length > 0) {
       exp.bullets.forEach((bullet, bulletIndex) => {
-        const isLastBullet = bulletIndex === exp.bullets.length - 1
-        elements.push(createBulletParagraph(bullet, layout, isLastBullet && !isLast ? false : isLastBullet))
-      })
-      
+        const isLastBullet = bulletIndex === exp.bullets.length - 1;
+        elements.push(
+          createBulletParagraph(
+            bullet,
+            layout,
+            isLastBullet && !isLast ? false : isLastBullet,
+          ),
+        );
+      });
+
       // Add small gap after the last bullet of each role (except the very last role)
       if (!isLast) {
         // The spacing is handled in createBulletParagraph via isLast param
         // But we need a bit more gap between roles
         elements[elements.length - 1] = createBulletParagraph(
-          exp.bullets[exp.bullets.length - 1], 
+          exp.bullets[exp.bullets.length - 1],
           layout,
-          true
-        )
+          true,
+        );
       }
     }
-  })
+  });
 
-  return elements
+  return elements;
 }
 
 /**
  * Generate skills section - just the skills, no extra label
- * 
+ *
  * @param {string} skills - Skills text
  * @param {Object} layout - Layout configuration from getAdaptiveLayout
  */
 function generateSkillsSection(skills, layout) {
   // Clean the skills text - remove any "Technical & Software:" prefix
-  let cleanSkills = skills
+  let cleanSkills = skills;
   const prefixesToRemove = [
     /^Technical\s*&?\s*Software\s*:?\s*/i,
     /^Technical Skills\s*:?\s*/i,
-    /^Skills\s*:?\s*/i
-  ]
-  
+    /^Skills\s*:?\s*/i,
+  ];
+
   for (const prefix of prefixesToRemove) {
-    cleanSkills = cleanSkills.replace(prefix, '')
+    cleanSkills = cleanSkills.replace(prefix, "");
   }
 
   return [
-    createSectionHeader('Skills', layout),
+    createSectionHeader("Skills", layout),
     new Paragraph({
       children: [
         new TextRun({
           text: cleanSkills.trim(),
           size: layout.FONT_SIZE.BODY,
-          font: FONT_FAMILY
-        })
+          font: FONT_FAMILY,
+        }),
       ],
-      spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT }
-    })
-  ]
+      spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT },
+    }),
+  ];
 }
 
 /**
  * Generate custom sections (Awards, Volunteering, Additional Experience, etc.)
  * Formats compactly - single-line entries when content is short
- * 
+ *
  * @param {Array} customSections - Custom section entries
  * @param {Object} layout - Layout configuration from getAdaptiveLayout
  */
 function generateCustomSections(customSections, layout) {
-  if (!customSections || customSections.length === 0) return []
+  if (!customSections || customSections.length === 0) return [];
 
-  const elements = []
+  const elements = [];
 
   customSections.forEach((section) => {
     // Skip sections with no content or empty content arrays
     if (!section.content || section.content.length === 0) {
-      console.log(`⏭️ Skipping empty custom section: ${section.title}`)
-      return
+      console.log(`⏭️ Skipping empty custom section: ${section.title}`);
+      return;
     }
-    
+
     // Filter out empty strings from content
-    const validContent = section.content.filter(item => item && item.trim().length > 0)
+    const validContent = section.content.filter(
+      (item) => item && item.trim().length > 0,
+    );
     if (validContent.length === 0) {
-      console.log(`⏭️ Skipping custom section with only empty content: ${section.title}`)
-      return
+      console.log(
+        `⏭️ Skipping custom section with only empty content: ${section.title}`,
+      );
+      return;
     }
-    
-    elements.push(createSectionHeader(section.title, layout))
+
+    elements.push(createSectionHeader(section.title, layout));
 
     if (validContent.length > 0) {
       // Check if entries are short enough for single-line formatting
-      const isCompactSection = validContent.every(item => item.length < 80)
-      
+      const isCompactSection = validContent.every((item) => item.length < 80);
+
       if (isCompactSection && validContent.length <= 4) {
         // Single-line format: join with semicolons or bullets inline
         elements.push(
           new Paragraph({
             children: [
               new TextRun({
-                text: validContent.join(' • '),
+                text: validContent.join(" • "),
                 size: layout.FONT_SIZE.BODY,
-                font: FONT_FAMILY
-              })
+                font: FONT_FAMILY,
+              }),
             ],
-            spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT }
-          })
-        )
+            spacing: {
+              after: layout.SPACING.ROLE_GAP,
+              line: layout.LINE_HEIGHT,
+            },
+          }),
+        );
       } else {
         // Standard bullet format with tight spacing
         validContent.forEach((item, itemIndex) => {
-          const isLastItem = itemIndex === validContent.length - 1
-          elements.push(createBulletParagraph(item, layout, isLastItem))
-        })
+          const isLastItem = itemIndex === validContent.length - 1;
+          elements.push(createBulletParagraph(item, layout, isLastItem));
+        });
       }
     }
-  })
+  });
 
-  return elements
+  return elements;
 }
 
 // ============================================
@@ -1000,41 +1266,193 @@ function generateCustomSections(customSections, layout) {
 // ============================================
 
 /**
+ * Rebuild a DOCX document with new layout settings
+ * Used during page count validation retry loop
+ *
+ * @param {Object} resumeData - Resume data structure
+ * @param {Object} layout - Layout configuration
+ * @param {string} filename - Output filename (unused but kept for API consistency)
+ * @returns {Document} - docx Document object
+ */
+async function rebuildDocumentWithLayout(resumeData, layout, filename) {
+  const docChildren = [];
+
+  // ---- HEADER: Name ----
+  docChildren.push(
+    new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [
+        new TextRun({
+          text: toTitleCase(resumeData.name),
+          bold: true,
+          size: layout.FONT_SIZE.NAME,
+          font: FONT_FAMILY,
+        }),
+      ],
+      spacing: { after: layout.SPACING.NAME_AFTER },
+    }),
+  );
+
+  // ---- CONTACT INFO ----
+  const contactParts = [
+    resumeData.contact?.phone,
+    resumeData.contact?.email,
+    resumeData.contact?.linkedin,
+  ].filter(Boolean);
+
+  if (contactParts.length > 0) {
+    docChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [
+          new TextRun({
+            text: contactParts.join(" | "),
+            size: layout.FONT_SIZE.CONTACT,
+            font: FONT_FAMILY,
+          }),
+        ],
+        spacing: { after: layout.SPACING.CONTACT_AFTER },
+      }),
+    );
+  }
+
+  // ---- EDUCATION SECTION ----
+  if (resumeData.education && resumeData.education.length > 0) {
+    docChildren.push(createSectionHeader("Education", layout));
+    docChildren.push(...generateEducationSection(resumeData.education, layout));
+  }
+
+  // ---- EXPERIENCE SECTION ----
+  if (resumeData.experience && resumeData.experience.length > 0) {
+    docChildren.push(createSectionHeader("Experience", layout));
+    docChildren.push(
+      ...generateExperienceSection(resumeData.experience, layout),
+    );
+  }
+
+  // ---- SKILLS SECTION ----
+  if (resumeData.skills) {
+    docChildren.push(...generateSkillsSection(resumeData.skills, layout));
+  }
+
+  // ---- ADDITIONAL SECTION ----
+  if (resumeData.additional) {
+    docChildren.push(createSectionHeader("Additional", layout));
+    docChildren.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: resumeData.additional,
+            size: layout.FONT_SIZE.BODY,
+            font: FONT_FAMILY,
+          }),
+        ],
+        spacing: { after: layout.SPACING.ROLE_GAP, line: layout.LINE_HEIGHT },
+      }),
+    );
+  }
+
+  // ---- CUSTOM SECTIONS ----
+  if (resumeData.custom_sections && resumeData.custom_sections.length > 0) {
+    docChildren.push(
+      ...generateCustomSections(resumeData.custom_sections, layout),
+    );
+  }
+
+  return new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: FONT_FAMILY,
+            size: layout.FONT_SIZE.BODY,
+          },
+        },
+      },
+    },
+    numbering: {
+      config: [
+        {
+          reference: "resume-bullets",
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.BULLET,
+              text: "•",
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: 280, hanging: 180 },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            size: {
+              width: 12240,
+              height: 15840,
+            },
+            margin: {
+              top: layout.MARGIN,
+              right: layout.MARGIN,
+              bottom: layout.MARGIN,
+              left: layout.MARGIN,
+            },
+          },
+        },
+        children: docChildren,
+      },
+    ],
+  });
+}
+
+/**
  * Calculate page fill percentage for a resume
  * Used to show visual indicator before download
- * 
+ *
  * @param {Object} resumeData - Resume data structure
  * @returns {Object} - { fillPercent, status, message }
  */
 export function measurePageFill(resumeData) {
   try {
-    const charCount = calculateCharCount(resumeData)
-    const layoutVars = getDefaultLayoutVars(charCount)
-    const height = measureResumeHeightWithVars(resumeData, layoutVars)
-    const contentLimit = getContentLimitPx(layoutVars.margins)
-    const fillPercent = Math.round((height / contentLimit) * 100)
-    
-    let status, message
+    const charCount = calculateCharCount(resumeData);
+    const layoutVars = getDefaultLayoutVars(charCount);
+    const height = measureResumeHeightWithVars(resumeData, layoutVars);
+    const contentLimit = getContentLimitPx(layoutVars.margins);
+    const fillPercent = Math.round((height / contentLimit) * 100);
+
+    let status, message;
     if (fillPercent > 100) {
-      status = 'overflow'
-      message = `Content exceeds 1 page (~${fillPercent - 100}% over). Layout will auto-compress.`
+      status = "overflow";
+      message = `Content exceeds 1 page (~${fillPercent - 100}% over). Layout will auto-compress.`;
     } else if (fillPercent > 95) {
-      status = 'tight'
-      message = 'Fits on 1 page (tight fit)'
+      status = "tight";
+      message = "Fits on 1 page (tight fit)";
     } else if (fillPercent > 75) {
-      status = 'good'
-      message = 'Fits well on 1 page'
+      status = "good";
+      message = "Fits well on 1 page";
     } else if (fillPercent > 50) {
-      status = 'comfortable'
-      message = 'Fits on 1 page with room to spare'
+      status = "comfortable";
+      message = "Fits on 1 page with room to spare";
     } else {
-      status = 'sparse'
-      message = 'Content is sparse - layout will expand to fill page'
+      status = "sparse";
+      message = "Content is sparse - layout will expand to fill page";
     }
-    
-    return { fillPercent, status, message, charCount }
+
+    return { fillPercent, status, message, charCount };
   } catch (e) {
-    console.error('Error measuring page fill:', e)
-    return { fillPercent: 0, status: 'unknown', message: 'Unable to measure', charCount: 0 }
+    console.error("Error measuring page fill:", e);
+    return {
+      fillPercent: 0,
+      status: "unknown",
+      message: "Unable to measure",
+      charCount: 0,
+    };
   }
 }

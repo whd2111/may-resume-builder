@@ -6,10 +6,15 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": {
-        target: "http://localhost:8000",
+      '/api': {
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/page-count': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/page-count/, '/2015-03-31/functions/function/invocations')
+      }
     },
   },
 });

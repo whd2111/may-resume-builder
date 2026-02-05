@@ -9,6 +9,10 @@ docker_compose('supabase/docker-compose.yml')
 # Run API in Docker container
 docker_compose('api/docker-compose.yml')
 
+# === FUNCTIONS ===
+# Run the page_count function in Docker container
+docker_compose('functions/docker-compose.yml')
+
 # === FRONTEND SERVICE ===
 # Run the Vite dev server as a local resource for fast iteration
 local_resource(
