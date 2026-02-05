@@ -10,10 +10,12 @@ const PAGE_COUNT_BASE =
 
 // If the URL is a local proxy path (e.g. "/page-count"), use it directly.
 // The proxy configuration (vite.config.js) handles the rewrite to the Lambda path.
-// If it's a full URL (production or direct local), append the standard Lambda path.
-const LAMBDA_ENDPOINT = PAGE_COUNT_BASE.startsWith("/")
-  ? PAGE_COUNT_BASE
-  : `${PAGE_COUNT_BASE}/2015-03-31/functions/function/invocations`;
+// If it's a localhost URL, append the standard RIE path.
+// Otherwise (production Lambda URL), use it as is.
+let LAMBDA_ENDPOINT = PAGE_COUNT_BASE;
+if (PAGE_COUNT_BASE.includes("localhost") && !PAGE_COUNT_BASE.startsWith("/")) {
+  LAMBDA_ENDPOINT = `${PAGE_COUNT_BASE}/2015-03-31/functions/function/invocations`;
+}
 
 /**
  * Get the page count of a DOCX blob by calling the page_count Lambda
@@ -153,9 +155,9 @@ export async function isPageCountServiceAvailable() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Send a minimal valid base64 string to avoid "expecting value" errors
-      body: JSON.stringify({ 
-        body: "UERG", 
-        filename: "healthcheck.pdf" 
+      body: JSON.stringify({
+        body: "UERG",
+        filename: "healthcheck.pdf",
       }),
       signal: AbortSignal.timeout(3000),
     });

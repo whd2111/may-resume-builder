@@ -2,28 +2,29 @@ export async function callClaude(apiKey, messages, systemPrompt) {
   try {
     // Call our backend API which proxies to Anthropic
     // This keeps the API key server-side and secure
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+    // In production (Vercel), VITE_API_URL can be empty to use relative paths
+    const apiUrl = import.meta.env.VITE_API_URL || "";
     const response = await fetch(`${apiUrl}/api/claude`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
       },
       body: JSON.stringify({
         messages: messages,
-        systemPrompt: systemPrompt
-      })
+        systemPrompt: systemPrompt,
+      }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error Response:', errorText);
+      console.error("API Error Response:", errorText);
       throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     return data.content[0].text;
   } catch (error) {
-    console.error('Claude API Error:', error);
+    console.error("Claude API Error:", error);
     throw error;
   }
 }
