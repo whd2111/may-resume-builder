@@ -95,7 +95,7 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
           <span className="action-card-icon">
             <DownloadIcon />
           </span>
-          <h2 className="action-card-title">Upload Your Resume</h2>
+          <h2 className="action-card-title">Make Your AI-Resume</h2>
           <p className="action-card-description">
             Upload your resume and any supporting documents. May will rewrite it using best practices and your additional context to craft a compelling 1-page resume.
           </p>
