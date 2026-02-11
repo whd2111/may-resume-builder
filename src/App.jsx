@@ -4,6 +4,7 @@ import { useAuth } from './contexts/AuthContext'
 import { useResumes } from './hooks/useResumes'
 import { usePrimeResume } from './hooks/usePrimeResume'
 import { usePrimeBullets } from './hooks/usePrimeBullets'
+import LandingPage from './components/LandingPage'
 import Home from './components/Home'
 import BuildResume from './components/BuildResume'
 import TailorJobs from './components/TailorJobs'
@@ -13,13 +14,15 @@ import Dashboard from './components/Dashboard'
 import ResumeBankUpload from './components/ResumeBankUpload'
 import PatternExtractor from './components/PatternExtractor'
 import ResumeBook from './components/ResumeBook'
+import EmployerPortal from './components/EmployerPortal'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
   const { primeResume, ensurePrimeResume, loading: primeLoading } = usePrimeResume()
   const { createBulletsBatch } = usePrimeBullets(primeResume?.id)
-  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns', 'resumebook'
+  const [page, setPage] = useState('landing') // 'landing', 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns', 'resumebook', 'employer'
+  const [userRole, setUserRole] = useState(null) // 'jobseeker' or 'employer'
   
   // Track if we've already bootstrapped to prevent double-runs
   const bootstrapRef = useRef(false)
@@ -106,6 +109,15 @@ function App() {
     )
   }
 
+  const handleSelectRole = (role) => {
+    setUserRole(role)
+    if (role === 'jobseeker') {
+      setPage('home')
+    } else if (role === 'employer') {
+      setPage('employer')
+    }
+  }
+
   const handleNavigate = (destination) => {
     setPage(destination)
   }
@@ -131,11 +143,31 @@ function App() {
   }
 
   const handleBack = () => {
-    setPage('home')
+    if (userRole === 'employer') {
+      setPage('employer')
+    } else {
+      setPage('home')
+    }
+  }
+
+  const handleBackToLanding = () => {
+    setPage('landing')
+    setUserRole(null)
   }
 
   return (
     <div className="app">
+      {page === 'landing' && (
+        <LandingPage onSelectRole={handleSelectRole} />
+      )}
+
+      {page === 'employer' && (
+        <EmployerPortal
+          onBack={handleBackToLanding}
+          user={user}
+        />
+      )}
+
       {page === 'home' && (
         <Home 
           onNavigate={handleNavigate}
