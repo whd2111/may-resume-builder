@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import '../App.css'
-import { WritingIcon, TargetIcon } from '../utils/icons'
+import { DownloadIcon, TargetIcon, CheckIcon } from '../utils/icons'
 import { useAuth } from '../contexts/AuthContext'
 import AuthModal from './auth/AuthModal'
 
@@ -93,11 +93,11 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
       <div className="action-cards">
         <div className="action-card stagger-1" onClick={() => onNavigate('build')}>
           <span className="action-card-icon">
-            <WritingIcon />
+            <DownloadIcon />
           </span>
-          <h2 className="action-card-title">Build Your Resume</h2>
+          <h2 className="action-card-title">Upload Your Resume</h2>
           <p className="action-card-description">
-            Create your primary 1-page resume from scratch or upload an existing one to improve. May will use best practices to craft a compelling professional resume.
+            Upload your resume and any supporting documents. May will rewrite it using best practices and your additional context to craft a compelling 1-page resume.
           </p>
         </div>
 
@@ -108,6 +108,16 @@ function Home({ onNavigate, user, hasPrimaryResume }) {
           <h2 className="action-card-title">Tailor for Jobs</h2>
           <p className="action-card-description">
             Customize your resume for specific roles. Paste one job description or multiple at once—May will create tailored versions for each.
+          </p>
+        </div>
+
+        <div className="action-card stagger-3" onClick={() => onNavigate('resumebook')}>
+          <span className="action-card-icon">
+            <CheckIcon />
+          </span>
+          <h2 className="action-card-title">Join CBS Resume Book</h2>
+          <p className="action-card-description">
+            Share your profile with the Columbia Business School community. Include your resume, LinkedIn, GitHub, and other professional links.
           </p>
         </div>
       </div>

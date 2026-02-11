@@ -208,6 +208,7 @@ function ResumeUpload({ onResumeComplete, onBack }) {
   const { createBulletsBatch } = usePrimeBullets(primeResume?.id)
   
   const [file, setFile] = useState(null)
+  const [supportingDocs, setSupportingDocs] = useState([]) // [{ file, label }]
   const [isProcessing, setIsProcessing] = useState(false)
   const [rewrittenResume, setRewrittenResume] = useState(null)
   const [showContactPrompter, setShowContactPrompter] = useState(false)
@@ -402,6 +403,35 @@ Please trim this resume to fit on 1 page more comfortably. Return ONLY the JSON 
     return text
   }
 
+  const handleAddSupportingDoc = (e) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      if (selectedFile.name.endsWith('.docx') || selectedFile.name.endsWith('.pdf')) {
+        setSupportingDocs(prev => [...prev, { file: selectedFile, label: '' }])
+      } else {
+        setError('Supporting documents must be .docx or .pdf files')
+      }
+    }
+    // Reset file input so the same file can be re-selected
+    e.target.value = ''
+  }
+
+  const handleSupportingDocLabelChange = (index, label) => {
+    setSupportingDocs(prev => prev.map((doc, i) => i === index ? { ...doc, label } : doc))
+  }
+
+  const handleRemoveSupportingDoc = (index) => {
+    setSupportingDocs(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const parseFile = async (file) => {
+    if (file.name.endsWith('.pdf')) {
+      return await parsePdf(file)
+    } else {
+      return await parseDocx(file)
+    }
+  }
+
   const handleRewrite = async () => {
     if (!file) return
 
@@ -409,16 +439,34 @@ Please trim this resume to fit on 1 page more comfortably. Return ONLY the JSON 
     setError('')
 
     try {
-      // Parse file based on type
-      let resumeText
-      if (file.name.endsWith('.pdf')) {
-        resumeText = await parsePdf(file)
-      } else {
-        resumeText = await parseDocx(file)
+      // Parse resume file
+      let resumeText = await parseFile(file)
+
+      // Parse supporting documents in parallel
+      let supportingContext = ''
+      if (supportingDocs.length > 0) {
+        const parsedDocs = await Promise.all(
+          supportingDocs.map(async (doc) => {
+            try {
+              const text = await parseFile(doc.file)
+              const label = doc.label?.trim() || doc.file.name
+              return { label, text }
+            } catch (err) {
+              console.warn(`Failed to parse supporting doc ${doc.file.name}:`, err)
+              return null
+            }
+          })
+        )
+
+        const validDocs = parsedDocs.filter(Boolean)
+        if (validDocs.length > 0) {
+          supportingContext = '\n\n--- SUPPORTING DOCUMENTS ---\nThe user has provided the following additional documents for context. Use these to better understand their experience, achievements, and skills. Extract any relevant details that could strengthen the resume bullets.\n\n'
+          + validDocs.map(doc => `[${doc.label}]:\n${doc.text}`).join('\n\n---\n\n')
+        }
       }
 
       // Send to Claude for rewriting
-      const prompt = `Here is the resume to rewrite:\n\n${resumeText}\n\nPlease rewrite this resume following best practices.`
+      const prompt = `Here is the resume to rewrite:\n\n${resumeText}${supportingContext}\n\nPlease rewrite this resume following best practices.`
       const response = await callClaude(null, [{ role: 'user', content: prompt }], REWRITE_PROMPT)
 
       // Parse response
@@ -732,6 +780,7 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
 
   const handleStartOver = () => {
     setFile(null)
+    setSupportingDocs([])
     setRewrittenResume(null)
     setShowContactPrompter(false)
     setShowMetricPrompter(false)
@@ -932,9 +981,9 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
       </nav>
 
       <div className="page-header">
-        <h1 className="page-title">Update Your Resume</h1>
+        <h1 className="page-title">Upload Your Resume</h1>
         <p className="page-subtitle">
-          Upload your existing resume and May will rewrite it using professional best practices
+          Upload your resume and any supporting documents — May will rewrite it using professional best practices
         </p>
       </div>
 
@@ -969,30 +1018,111 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
             <div className="card-premium stagger-1">
               <div className="card-title">
                 <DownloadIcon />
-                Selected File
+                Resume
               </div>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-xl)', fontSize: '18px' }}>
+              <p style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-lg)', fontSize: '18px' }}>
                 {file.name}
               </p>
-              <div className="button-group">
-                <button className="btn btn-secondary" onClick={handleStartOver}>
-                  Choose Different File
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleRewrite}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <div className="loading"></div>
-                  ) : (
-                    <>
-                      <WritingIcon />
-                      Rewrite Resume
-                    </>
-                  )}
-                </button>
+              <button className="btn btn-secondary" onClick={handleStartOver} style={{ fontSize: '14px' }}>
+                Choose Different File
+              </button>
+            </div>
+
+            {/* Supporting Documents */}
+            <div className="card-premium stagger-2" style={{ marginTop: 'var(--space-lg)' }}>
+              <div className="card-title">
+                <WritingIcon />
+                Supporting Documents
+                <span style={{ fontWeight: '400', fontSize: '14px', color: 'var(--text-secondary)', marginLeft: '8px' }}>(optional)</span>
               </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: 'var(--space-lg)', lineHeight: '1.5' }}>
+                Add any documents that provide context — job descriptions, cover letters, performance reviews, LinkedIn exports, brag docs, etc. May will use these to write stronger, more relevant bullets.
+              </p>
+
+              {supportingDocs.map((doc, index) => (
+                <div key={index} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  background: 'var(--bg-subtle)',
+                  borderRadius: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      {doc.file.name}
+                    </span>
+                    <input
+                      type="text"
+                      value={doc.label}
+                      onChange={(e) => handleSupportingDocLabelChange(index, e.target.value)}
+                      placeholder="What is this? (e.g., Job Description, Performance Review)"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        fontSize: '14px',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        background: 'white'
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleRemoveSupportingDoc(index)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-tertiary)',
+                      cursor: 'pointer',
+                      fontSize: '18px',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      flexShrink: 0
+                    }}
+                    title="Remove document"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              <button
+                onClick={() => document.getElementById('supporting-doc-input').click()}
+                className="btn btn-secondary"
+                style={{ fontSize: '14px', width: '100%', justifyContent: 'center' }}
+              >
+                + Add Supporting Document
+              </button>
+              <input
+                id="supporting-doc-input"
+                type="file"
+                accept=".docx,.pdf"
+                onChange={handleAddSupportingDoc}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {/* Rewrite Button */}
+            <div style={{ marginTop: 'var(--space-lg)', textAlign: 'center' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleRewrite}
+                disabled={isProcessing}
+                style={{ minWidth: '220px', fontSize: '16px', padding: '14px 32px' }}
+              >
+                {isProcessing ? (
+                  <div className="loading"></div>
+                ) : (
+                  <>
+                    <WritingIcon />
+                    Rewrite Resume
+                  </>
+                )}
+              </button>
             </div>
           )}
 
@@ -1002,13 +1132,15 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
             </div>
           )}
 
-          <div className="card-premium stagger-2">
+          <div className="card-premium stagger-3">
             <div className="card-title">
               <WritingIcon />
               What May will do:
             </div>
             <div className="info-box-text" style={{ fontSize: '15px', lineHeight: '1.8' }}>
               • Rewrite bullets with strong action verbs and "did X by Y as shown by Z" framework
+              <br />
+              • Pull in details from your supporting documents to strengthen bullets
               <br />
               • Add or improve metrics to quantify your impact
               <br />

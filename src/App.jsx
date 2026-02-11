@@ -12,13 +12,14 @@ import ResumeLibrary from './components/ResumeLibrary'
 import Dashboard from './components/Dashboard'
 import ResumeBankUpload from './components/ResumeBankUpload'
 import PatternExtractor from './components/PatternExtractor'
+import ResumeBook from './components/ResumeBook'
 
 function App() {
   const { user, loading: authLoading } = useAuth()
   const { masterResume: primaryResume, createResume, updateResume, setAsMaster: setAsPrimary, loading: resumesLoading } = useResumes()
   const { primeResume, ensurePrimeResume, loading: primeLoading } = usePrimeResume()
   const { createBulletsBatch } = usePrimeBullets(primeResume?.id)
-  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns'
+  const [page, setPage] = useState('home') // 'home', 'build', 'tailor', 'review', 'library', 'dashboard', 'resumebank', 'patterns', 'resumebook'
   
   // Track if we've already bootstrapped to prevent double-runs
   const bootstrapRef = useRef(false)
@@ -191,6 +192,13 @@ function App() {
       {page === 'patterns' && (
         <PatternExtractor
           onBack={handleBack}
+        />
+      )}
+
+      {page === 'resumebook' && (
+        <ResumeBook
+          onBack={handleBack}
+          user={user}
         />
       )}
     </div>
