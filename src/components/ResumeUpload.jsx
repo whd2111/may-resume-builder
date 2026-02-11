@@ -1015,21 +1015,22 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
               />
             </div>
           ) : (
-            <div className="card-premium stagger-1">
-              <div className="card-title">
-                <DownloadIcon />
-                Resume
+            <>
+              <div className="card-premium stagger-1">
+                <div className="card-title">
+                  <DownloadIcon />
+                  Resume
+                </div>
+                <p style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-lg)', fontSize: '18px' }}>
+                  {file.name}
+                </p>
+                <button className="btn btn-secondary" onClick={handleStartOver} style={{ fontSize: '14px' }}>
+                  Choose Different File
+                </button>
               </div>
-              <p style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: 'var(--space-lg)', fontSize: '18px' }}>
-                {file.name}
-              </p>
-              <button className="btn btn-secondary" onClick={handleStartOver} style={{ fontSize: '14px' }}>
-                Choose Different File
-              </button>
-            </div>
 
-            {/* Supporting Documents */}
-            <div className="card-premium stagger-2" style={{ marginTop: 'var(--space-lg)' }}>
+              {/* Supporting Documents */}
+              <div className="card-premium stagger-2" style={{ marginTop: 'var(--space-lg)' }}>
               <div className="card-title">
                 <WritingIcon />
                 Supporting Documents
@@ -1124,6 +1125,7 @@ Please manually remove approximately ${Math.ceil(retryErr.overflowPercent / 2)} 
                 )}
               </button>
             </div>
+            </>
           )}
 
           {error && (
