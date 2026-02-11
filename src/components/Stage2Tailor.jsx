@@ -317,14 +317,28 @@ Rewrite these bullets to emphasize the must-haves and primary keywords while fol
     setShowComparison(true)
   }
 
+  // Build tracked changes array by joining rewrittenBullets with selection originals
+  const buildChangedBullets = () => {
+    if (!rewrittenBullets || !selection?.selected_bullets) return null
+    return rewrittenBullets.map(rb => {
+      const original = selection.selected_bullets.find(sb => sb.bullet_id === rb.bullet_id)
+      return {
+        bullet_id: rb.bullet_id,
+        original_text: original?.original_text || '',
+        new_text: rb.new_text,
+      }
+    }).filter(cb => cb.original_text && cb.original_text !== cb.new_text)
+  }
+
   const handleDownload = async () => {
     try {
       // Use company name from checklist if available
       const companyName = checklist?.job_metadata?.company_name || 'TAILORED'
-      
+      const changedBullets = buildChangedBullets()
+
       // Try to generate - if overflow, auto-trim and retry
       try {
-        await generateDOCX(tailoredResume, null, companyName)
+        await generateDOCX(tailoredResume, null, companyName, null, changedBullets)
         alert('Resume downloaded successfully!')
       } catch (docError) {
         // If overflow, auto-trim and retry once
@@ -358,8 +372,8 @@ Please trim this resume to fit on 1 page. Return ONLY the JSON object with the t
             // Update state with trimmed version
             setTailoredResume(sortedTrimmed)
             
-            // Retry document generation
-            await generateDOCX(sortedTrimmed, null, companyName)
+            // Retry document generation (no tracked changes after trim - content was further modified)
+            await generateDOCX(sortedTrimmed, null, companyName, null, null)
             alert('Resume auto-trimmed and downloaded successfully!')
             console.log(`✅ Auto-trim successful`)
           } else {

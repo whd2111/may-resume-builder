@@ -3,6 +3,8 @@ import {
   Packer,
   Paragraph,
   TextRun,
+  InsertedTextRun,
+  DeletedTextRun,
   AlignmentType,
   LevelFormat,
   BorderStyle,
@@ -467,7 +469,7 @@ function createBulletParagraph(text, layout, isLast = false) {
 // MAIN EXPORT FUNCTION
 // ============================================
 
-export async function generateDOCX(resumeData, filename = null, companyName = null, layoutOverrides = null) {
+export async function generateDOCX(resumeData, filename = null, companyName = null, layoutOverrides = null, changedBullets = null) {
   // Auto-generate filename if not provided
   if (!filename) {
     const nameParts = resumeData.name.trim().split(' ')
@@ -558,7 +560,21 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   
   // Content is frozen - we only use cleanedData from here, never modify it
   const onePageData = cleanedData
-  
+
+  // Build changes map for tracked revisions (new_text → original_text)
+  // Only content changes (rewritten bullets) get tracked - not formatting
+  // We key by new_text since experience may be re-sorted after bullet rewriting
+  const changesMap = new Map()
+  if (changedBullets && changedBullets.length > 0) {
+    for (const change of changedBullets) {
+      if (change.original_text && change.new_text && change.original_text !== change.new_text) {
+        changesMap.set(change.new_text, change.original_text)
+      }
+    }
+    console.log(`📝 Tracked changes: ${changesMap.size} bullet revisions`)
+  }
+  const hasTrackedChanges = changesMap.size > 0
+
   // Build document content using adaptive layout
   const docChildren = []
 
@@ -612,7 +628,7 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
   // ---- EXPERIENCE SECTION ----
   if (onePageData.experience && onePageData.experience.length > 0) {
     docChildren.push(createSectionHeader('Experience', layout))
-    docChildren.push(...generateExperienceSection(onePageData.experience, layout))
+    docChildren.push(...generateExperienceSection(onePageData.experience, layout, changesMap))
   }
 
   // ---- SKILLS SECTION (compact, no extra label) ----
@@ -644,6 +660,9 @@ export async function generateDOCX(resumeData, filename = null, companyName = nu
 
   // Create the document with adaptive layout margins
   const doc = new Document({
+    features: {
+      trackRevisions: hasTrackedChanges,
+    },
     styles: {
       default: {
         document: {
@@ -822,13 +841,59 @@ function generateEducationSection(education, layout) {
 }
 
 /**
+ * Create a bullet paragraph with tracked changes (deletion + insertion)
+ * Shows the original text as deleted and the new text as inserted
+ *
+ * @param {string} newText - The new (tailored) bullet text
+ * @param {string} originalText - The original bullet text being replaced
+ * @param {Object} layout - Layout configuration from getAdaptiveLayout
+ * @param {boolean} isLast - Whether this is the last bullet in a section
+ */
+let _revisionId = 0
+function createTrackedChangeBulletParagraph(newText, originalText, layout, isLast = false) {
+  const revisionDate = new Date().toISOString()
+  return new Paragraph({
+    numbering: {
+      reference: 'resume-bullets',
+      level: 0
+    },
+    children: [
+      new DeletedTextRun({
+        text: originalText,
+        id: _revisionId++,
+        author: 'May',
+        date: revisionDate,
+        size: layout.FONT_SIZE.BULLET,
+        font: FONT_FAMILY
+      }),
+      new InsertedTextRun({
+        text: newText,
+        id: _revisionId++,
+        author: 'May',
+        date: revisionDate,
+        size: layout.FONT_SIZE.BULLET,
+        font: FONT_FAMILY
+      }),
+    ],
+    spacing: {
+      after: isLast ? layout.SPACING.ROLE_GAP : layout.SPACING.BULLET_AFTER,
+      line: layout.LINE_HEIGHT
+    }
+  })
+}
+
+/**
  * Generate experience entries with dates right-aligned on company line
- * 
+ *
  * @param {Array} experience - Experience entries
  * @param {Object} layout - Layout configuration from getAdaptiveLayout
+ * @param {Map} changesMap - Map of new_text → original_text for tracked changes
  */
-function generateExperienceSection(experience, layout) {
+function generateExperienceSection(experience, layout, changesMap = new Map()) {
   if (!experience || experience.length === 0) return []
+
+  // Reset revision ID counter for each document generation
+  _revisionId = 0
 
   const elements = []
 
@@ -879,22 +944,32 @@ function generateExperienceSection(experience, layout) {
       })
     )
 
-    // Bullets with tight spacing
+    // Bullets with tight spacing - use tracked changes for rewritten bullets
     if (exp.bullets && exp.bullets.length > 0) {
       exp.bullets.forEach((bullet, bulletIndex) => {
         const isLastBullet = bulletIndex === exp.bullets.length - 1
-        elements.push(createBulletParagraph(bullet, layout, isLastBullet && !isLast ? false : isLastBullet))
+        const isLastParam = isLastBullet && !isLast ? false : isLastBullet
+        const originalText = changesMap.get(bullet)
+
+        if (originalText) {
+          // This bullet was rewritten - emit as tracked change
+          elements.push(createTrackedChangeBulletParagraph(bullet, originalText, layout, isLastParam))
+        } else {
+          // Unchanged bullet - render normally
+          elements.push(createBulletParagraph(bullet, layout, isLastParam))
+        }
       })
-      
+
       // Add small gap after the last bullet of each role (except the very last role)
       if (!isLast) {
-        // The spacing is handled in createBulletParagraph via isLast param
-        // But we need a bit more gap between roles
-        elements[elements.length - 1] = createBulletParagraph(
-          exp.bullets[exp.bullets.length - 1], 
-          layout,
-          true
-        )
+        const lastBullet = exp.bullets[exp.bullets.length - 1]
+        const originalText = changesMap.get(lastBullet)
+
+        if (originalText) {
+          elements[elements.length - 1] = createTrackedChangeBulletParagraph(lastBullet, originalText, layout, true)
+        } else {
+          elements[elements.length - 1] = createBulletParagraph(lastBullet, layout, true)
+        }
       }
     }
   })
